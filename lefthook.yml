@@ -1,0 +1,11 @@
+# Git hooks — managed by lefthook. Installed by `ccc-cli wiki hook install`.
+# Local overrides: lefthook-local.yml (gitignored). Activate: lefthook install
+
+output:
+  - failure
+pre-commit:
+  jobs:
+    - name: secrets-scan
+      # gitleaks: default ruleset + entropy checks over the staged diff.
+      # Path exemptions live in .gitleaks.toml.
+      run: gitleaks git --staged --pre-commit --no-banner --redact
