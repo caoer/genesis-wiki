@@ -1,0 +1,16 @@
+# Meridian (md) config — the wiki's primary tool. This file is class: seed (birth-written,
+# instance-owned — evolve skips/params freely); health/rules/contract/ is class: contract
+# (upgrades blind-regen the LAW; your config stays yours).
+#
+# NO role: key here — a WIKI's role lives in LLM_WIKI.md wiki-role: (contract C45
+# `role-selects-lint-pack`); meridian.yaml role: is for COMPANION repos only (no LLM_WIKI.md
+# there). Declaring both = drift ERROR.
+version: "0.1"
+rule_packs:
+  - path: health/rules/contract    # materialized contract pack — hash-gated, blind-regen on upgrade
+  - path: health/rules/{{WIKI_SLUG}}   # instance overlay — starts near-empty, yours
+scan:
+  root: .
+  max_file_size: 10485760
+  skip: [.git, .obsidian, .claude, node_modules, .ucc, .direnv, foreign]
+  # Path-scope any in-tree skip (never bare names like `sessions` — shadow-bug class).
