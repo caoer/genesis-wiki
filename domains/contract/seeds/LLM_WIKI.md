@@ -14,6 +14,6 @@ created: {{YYYY-MM-DD}}
 
 <!-- REQUIRED. Without this section the wiki is INVISIBLE at skill load (R14 F1) — the whole design
      depends on it. The home wiki is always the skill's primary expectation; other wikis inject UNDER it.
-     Canonical section shape: the llm-wiki skill's setup/wiki-root-contract.md (skill lane owns) —
-     copy it verbatim, then fill the injection lines for this wiki. -->
-{{LOAD_SKILL_SECTION}}
+     Copy the canonical shape from the llm-wiki skill: setup/wiki-root-contract.md § Template
+     (the skill owns the shape — point-or-own; do not invent a variant here). -->
+{{LOAD_SKILL_SECTION — copy from llm-wiki skill setup/wiki-root-contract.md § Template, then fill for this wiki}}
