@@ -5,7 +5,7 @@ tags: [type/tier-index]
 
 # seeds/ — the birth tree
 
-Copy this tree verbatim to the child root, then fill every `{{PLACEHOLDER}}`. Different agents following this must produce almost identical results — that is the acceptance test.
+Copy this tree verbatim to the child root — **everything except this README file itself** (it documents the seeds; it is not a seed) — then fill every `{{PLACEHOLDER}}`. Different agents following this must produce almost identical results — that is the acceptance test.
 
 **Fill rules:**
 - `{{WIKI_SLUG}}` — the child's slug: repo name = folder name = vault name (contract C22 `realpath-coherence`).

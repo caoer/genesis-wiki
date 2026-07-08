@@ -16,7 +16,7 @@ manifest:
   - {path: SCHEMA.md, class: seed, sha: "{{BIRTH_BLOB_SHA}}"}
   - {path: domains/contract/genesis-contract/contract-v1.md, class: contract, sha: "{{BLOB_SHA}}"}
   - {path: domains/contract/genesis-contract/architecture-block.md, class: contract, sha: "{{BLOB_SHA}}"}
-  - {path: health/rules/contract, class: contract, sha: "{{TREE_SHA}}"}
+  # health/rules/contract row appears when genesis ships the contract rule pack — do not add it before the tree exists upstream
   - {path: meridian.yaml, class: seed, sha: "{{BIRTH_BLOB_SHA}}"}
   - {path: CLAUDE.md, class: seed, sha: "{{BIRTH_BLOB_SHA}}"}
 tags: [meta/genesis]
