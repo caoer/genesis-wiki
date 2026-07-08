@@ -1,0 +1,28 @@
+filters:
+  and:
+    - file.path.contains("sources/git/")
+    - file.ext == "md"
+    - note.type == "repo"
+properties:
+  file.name:
+    displayName: Repo
+  description:
+    displayName: Description
+  ownership:
+    displayName: Ownership
+  role:
+    displayName: Role
+  upstream:
+    displayName: Upstream
+  created:
+    displayName: Created
+views:
+  - type: table
+    name: Catalog
+    order:
+      - file.name
+      - role
+      - ownership
+      - upstream
+      - description
+      - created
