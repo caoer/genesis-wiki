@@ -1,7 +1,8 @@
 ---
 title: "{{WIKI_SLUG}} schema"
-contract-version: 1        # human-facing law generation (the load-skill identity line reads this);
-                           # the commit-precise pin lives in GENESIS.md — different facts, no duplication
+# human-facing law generation (the load-skill identity line reads this);
+# the commit-precise pin lives in GENESIS.md — different facts, no duplication
+contract-version: 1
 tags: [type/schema]
 created: {{YYYY-MM-DD}}
 ---
