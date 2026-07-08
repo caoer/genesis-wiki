@@ -1,6 +1,6 @@
 ---
 title: "contract-v1 — the genesis llm-wiki contract"
-version: 1.0.0
+version: 1.0.0 (+C49 pending ratification)
 status: ratified — user-approved 2026-07-08 (draft 6 approved; draft 7 carried the one ruled change)
 provenance: "designed by a six-lane panel over rounds R1–R12 (decisions D1–D5 as amended); drafting record lives in the authoring session, session 08-02-born-genesis-wiki of the home wiki (private — referenced by name, not link)"
 tags: [type/contract, domain/contract]
@@ -116,6 +116,10 @@ flowchart LR
 - **C46 `bases-move-with-data` — Views live with their data.** A `.base` view joining a repo's data lives in that repo (session-joining views move into `<slug>-sessions`). This is mechanical necessity, not preference: **Obsidian bases cannot query across vaults** — a view separated from its rows is dead. Adopt the tool's constraints; a view reaching across a repo boundary is a design smell.
 - **C47 `cheap-cutover` — Migration is cheap by decree.** Companion adoption is a forward cutover: repoint the path resolution, bulk string-change whatever needs repointing, in one commit gated by a zero-broken-links verify. History migration means nothing; preserving old link topology is a non-goal. **Order is contract:** the canonical cross-repo reference form (C48) exists *before* any repoint — never bulk-edit twice — and same-change cleanup of now-dead config (rule exclusions, exemption entries, stale doc pointers) rides the cutover commit, or the sediment lesson repeats.
 - **C48 `companion-addressability` — Companions are wiki://-addressable.** A companion slug is just a slug (C20): `wiki://<wiki-slug>-sessions/<path>@<commit>` works with zero new grammar — C24's provenance class and C26's audit apply unchanged. Once sessions leave the vault, wiki→session references are cross-repo by definition and use this form (frontmatter-first per C24); the companion commit must exist before a wiki page cites it `@commit` — **companion commits first, wiki second** (independent repos, no gitlink). **Implicit-trio rule:** the URI audit accepts a wiki's own `<slug>-{sessions,assets,secrets}` without a `reference-wikis` entry — derivable names are never declared (C43); non-trio companions likewise resolve by grammar. The C21 privacy DAG governs *reference grammar only* — a prose mention of a more-private path is a voice-norm matter for the role's pack (C45), not a DAG violation.
+
+## §11 Upstream layout
+
+- **C49 `upstream-layout` — Upstream's own shape.** *(pending user ratification — first post-v1 amendment, from R13 bootstrap finding 1.)* Genesis keeps everything it ships inside the contract cluster: `domains/contract/genesis-contract/` carries the law, the genesis-owned literate blocks, and check/computed-surface definitions; `domains/contract/seeds/` carries the birth tree — the C8 seed set laid out **exactly as it lands relative to a child's root**, so birth is a verbatim copy with the slug filled in, never a mapping table that can drift. Anything outside the contract cluster is genesis's own wiki content about the wiki-of-wikis, and is never shipped to children. *Why:* the v1 bootstrap proved the gap — C8 names the seed set but no clause said where seeds live upstream; a scaffold with no defined source makes every birth an act of archaeology.
 
 ## Drafting rulings (draft 3 — all reviewing lanes concur; panel rulings)
 
