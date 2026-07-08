@@ -1,0 +1,89 @@
+filters:
+  and:
+    - file.path.contains("logs/")
+    - file.ext == "md"
+    - file.name != "LOGS"
+formulas:
+  month: file.name.split("-")[0] + "-" + file.name.split("-")[1]
+  day: file.name.split("-")[0] + "-" + file.name.split("-")[1] + "-" + file.name.split("-")[2]
+properties:
+  file.name:
+    displayName: Entry
+  formula.day:
+    displayName: Day
+  formula.month:
+    displayName: Month
+  op:
+    displayName: Op
+  date:
+    displayName: Date
+  created:
+    displayName: Created
+  file.mtime:
+    displayName: Modified
+views:
+  - type: table
+    name: All
+    order:
+      - file.name
+      - op
+      - date
+      - tags
+    sort:
+      - property: file.name
+        direction: DESC
+    columnSize:
+      file.name: 440
+  - type: table
+    name: Recent
+    order:
+      - file.name
+      - op
+      - date
+    sort:
+      - property: file.name
+        direction: DESC
+    limit: 20
+    columnSize:
+      file.name: 440
+  - type: table
+    name: By op
+    groupBy:
+      property: op
+      direction: ASC
+    order:
+      - file.name
+      - date
+    sort:
+      - property: file.name
+        direction: DESC
+    columnSize:
+      file.name: 440
+  - type: table
+    name: By month
+    groupBy:
+      property: formula.month
+      direction: DESC
+    order:
+      - file.name
+      - op
+      - date
+    sort:
+      - property: file.name
+        direction: DESC
+    columnSize:
+      file.name: 440
+  - type: table
+    name: Gaps
+    filters:
+      not:
+        - file.hasProperty("date")
+    order:
+      - file.name
+      - op
+      - formula.day
+    sort:
+      - property: file.name
+        direction: DESC
+    columnSize:
+      file.name: 440

@@ -1,0 +1,62 @@
+filters:
+  and:
+    - file.ext == "md"
+    - or:
+        - file.path.startsWith("inbox/")
+        - file.path.startsWith("wiki/inbox/")
+formulas:
+  lane: if(file.path.contains("inbox/filed/"), file.path.split("inbox/filed/")[1].split("/")[0] + "/" + file.path.split("inbox/filed/")[1].split("/")[1], file.folder.split("inbox/")[1].split("/")[0])
+properties:
+  file.name:
+    displayName: Page
+  formula.lane:
+    displayName: Lane
+  type:
+    displayName: Type
+  source:
+    displayName: Source
+  created:
+    displayName: Created
+  file.mtime:
+    displayName: Modified
+views:
+  - type: table
+    name: By lane
+    filters:
+      and:
+        - formula.lane != "_unstaged"
+    groupBy:
+      property: formula.lane
+      direction: ASC
+    order:
+      - file.name
+      - type
+      - created
+    columnSize:
+      file.name: 320
+  - type: table
+    name: Staging
+    filters:
+      and:
+        - formula.lane == "_unstaged"
+    order:
+      - file.name
+      - type
+      - created
+    columnSize:
+      file.name: 360
+  - type: table
+    name: Recent
+    filters:
+      and:
+        - formula.lane != "_unstaged"
+    order:
+      - file.name
+      - formula.lane
+      - type
+    sort:
+      - property: created
+        direction: DESC
+    limit: 20
+    columnSize:
+      file.name: 320

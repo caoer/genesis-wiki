@@ -1,0 +1,26 @@
+version: "0.1"
+rule_packs:
+  # Enforcement map: health/HEALTH.md. Contract pack + local overlay + effects pack.
+  - path: health/rules/contract
+  - path: health/rules/local
+  - path: health/rules/effects
+scan:
+  root: .
+  max_file_size: 10485760
+  skip:
+    - .git
+    - .obsidian
+    - .claude
+    - node_modules
+    - .ucc
+    - .direnv
+    - .data
+    - .tmp
+    - foreign
+    - dist
+    - result
+rule_params:
+  wikilink-canonicalize:
+    roots:
+      - "**"
+      - "!sessions/**"

@@ -1,0 +1,107 @@
+filters:
+  and:
+    - file.path.contains("domains/")
+    - file.ext == "md"
+formulas:
+  cluster: file.folder.split("domains/")[1].split("/")[0]
+  domain: file.folder.split("domains/")[1].split("/")[1]
+properties:
+  file.name:
+    displayName: Domain
+  formula.cluster:
+    displayName: Cluster
+  formula.domain:
+    displayName: Under
+  description:
+    displayName: Description
+  status:
+    displayName: Status
+  created:
+    displayName: Created
+  file.mtime:
+    displayName: Modified
+views:
+  - type: table
+    name: By cluster
+    filters:
+      and:
+        - file.hasTag("type/domain-index")
+    groupBy:
+      property: formula.cluster
+      direction: ASC
+    order:
+      - file.name
+      - description
+      - formula.domain
+      - created
+    columnSize:
+      file.name: 240
+      note.description: 688
+  - type: table
+    name: Folder
+    filters:
+      and:
+        - file.folder == this.file.folder
+        - '!file.hasTag("type/domain-index")'
+    order:
+      - file.name
+      - type
+      - created
+    columnSize:
+      file.name: 340
+  - type: table
+    name: All domains
+    filters:
+      and:
+        - file.hasTag("type/domain-index")
+    order:
+      - formula.cluster
+      - file.name
+      - description
+      - updated
+    sort:
+      - property: updated
+        direction: DESC
+    columnSize:
+      file.name: 240
+      note.description: 560
+  - type: table
+    name: Recent
+    filters:
+      and:
+        - file.hasTag("type/domain-index")
+    groupBy:
+      property: created
+      direction: DESC
+    order:
+      - file.name
+      - formula.cluster
+      - created
+      - updated
+    sort:
+      - property: updated
+        direction: DESC
+      - property: created
+        direction: DESC
+    limit: 15
+  - type: table
+    name: Synthesis
+    filters:
+      and:
+        - file.hasTag("type/synthesis")
+    groupBy:
+      property: formula.cluster
+      direction: ASC
+    order:
+      - file.name
+      - formula.cluster
+      - file.mtime
+  - type: table
+    name: Gaps
+    filters:
+      and:
+        - file.hasTag("type/domain-index")
+        - '!file.hasProperty("description")'
+    order:
+      - formula.cluster
+      - file.name

@@ -1,0 +1,44 @@
+# Wiki Git Hooks — managed by lefthook
+# Local overrides: lefthook-local.yml (gitignored)
+# Install: lefthook install
+
+output:
+  - failure
+
+pre-commit:
+  jobs:
+    - name: secrets-scan
+      # gitleaks: default ruleset + entropy checks over the staged diff.
+      # Path exemptions (vendored Obsidian plugin/theme builds) live in .gitleaks.toml.
+      run: gitleaks git --staged --pre-commit --no-banner --redact
+
+post-checkout:
+  jobs:
+    - name: session-drift-guard
+      run: |
+        # Warn if sessions/ has uncommitted changes that a checkout might clobber.
+        dirty=$(git diff --name-only -- sessions/ 2>/dev/null | head -5)
+        if [ -n "$dirty" ]; then
+          echo "⚠️  SESSION-DRIFT: uncommitted changes in sessions/ — commit before running git ops on this checkout"
+          echo "$dirty"
+        fi
+
+post-merge:
+  jobs:
+    - name: session-drift-guard
+      run: |
+        dirty=$(git diff --name-only -- sessions/ 2>/dev/null | head -5)
+        if [ -n "$dirty" ]; then
+          echo "⚠️  SESSION-DRIFT: uncommitted changes in sessions/ — commit now"
+          echo "$dirty"
+        fi
+
+pre-push:
+  parallel: true
+  jobs:
+    - name: wiki-lint
+      run: md check
+    - name: domain-home-unique
+      run: md run '{"file":"health/domain-home-unique.md","name":"check"}'
+    - name: wikilink-residue-classes
+      run: md run '{"file":"health/wikilink-residue-classes.md","name":"check"}'

@@ -1,0 +1,59 @@
+filters:
+  and:
+    - file.inFolder("sessions")
+    - or:
+        - file.hasProperty("stake-holder")
+        - type == "decision"
+formulas:
+  stakeholder: note["stake-holder"]
+views:
+  - type: table
+    name: Needs Me
+    filters:
+      and:
+        - status == "pending"
+        - note["stake-holder"] == "user-only"
+    order:
+      - file.name
+      - status
+      - file.folder
+  - type: table
+    name: Review Later
+    filters:
+      and:
+        - status == "pending"
+        - note["stake-holder"] == "agent-user"
+    order:
+      - file.name
+      - status
+      - file.folder
+  - type: table
+    name: All Pending
+    filters:
+      and:
+        - status == "pending"
+    groupBy:
+      property: formula.stakeholder
+      direction: ASC
+    order:
+      - file.name
+      - formula.stakeholder
+      - status
+      - file.folder
+  - type: table
+    name: All Decisions
+    filters:
+      and:
+        - type == "decision"
+    order:
+      - file.name
+      - status
+      - session
+      - task
+      - created
+      - file.folder
+    sort:
+      - property: created
+        direction: DESC
+      - property: file.name
+        direction: ASC

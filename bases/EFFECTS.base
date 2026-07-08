@@ -1,0 +1,156 @@
+filters:
+  and:
+    - file.ext == "md"
+    - file.hasTag("type/effect")
+formulas:
+  kind: file.folder.split("effects/")[1].split("/")[0]
+  pin: if(contains(commit, "PENDING"), "PENDING", "pinned")
+properties:
+  file.name:
+    displayName: Effect
+  formula.kind:
+    displayName: Kind
+  formula.pin:
+    displayName: Pin
+  repo:
+    displayName: Repo
+  commit:
+    displayName: Commit
+  branch:
+    displayName: Branch
+  checksum:
+    displayName: Checksum
+  description:
+    displayName: Description
+  status:
+    displayName: Status
+  updated_at:
+    displayName: Updated
+  created_at:
+    displayName: Created
+  file.mtime:
+    displayName: Modified
+views:
+  - type: table
+    name: By kind
+    filters:
+      and:
+        - '!file.hasTag("status/retired")'
+    groupBy:
+      property: formula.kind
+      direction: ASC
+    order:
+      - file.name
+      - repo
+      - commit
+      - description
+      - updated_at
+    columnSize:
+      file.name: 260
+      note.description: 560
+  - type: table
+    name: All effects
+    order:
+      - formula.kind
+      - file.name
+      - repo
+      - commit
+      - description
+    columnSize:
+      file.name: 260
+      note.description: 520
+  - type: table
+    name: Skills
+    filters:
+      and:
+        - formula.kind == "skills"
+    order:
+      - file.name
+      - repo
+      - commit
+      - description
+    columnSize:
+      file.name: 260
+  - type: table
+    name: Agents
+    filters:
+      and:
+        - formula.kind == "agents"
+    order:
+      - file.name
+      - repo
+      - commit
+      - description
+    columnSize:
+      file.name: 300
+  - type: table
+    name: Sites & docs
+    filters:
+      and:
+        - or:
+            - formula.kind == "sites"
+            - formula.kind == "documents"
+            - formula.kind == "prompts"
+    order:
+      - formula.kind
+      - file.name
+      - repo
+      - commit
+      - description
+    columnSize:
+      file.name: 260
+  - type: table
+    name: Pending pins
+    filters:
+      and:
+        - formula.pin == "PENDING"
+    order:
+      - formula.kind
+      - file.name
+      - repo
+      - commit
+    columnSize:
+      file.name: 260
+  - type: table
+    name: Retired
+    filters:
+      and:
+        - file.hasProperty("status")
+        - status == "retired"
+    order:
+      - formula.kind
+      - file.name
+      - description
+    columnSize:
+      file.name: 260
+  - type: table
+    name: Recent
+    filters:
+      and:
+        - '!file.hasTag("status/retired")'
+    order:
+      - file.name
+      - formula.kind
+      - repo
+      - updated_at
+    sort:
+      - property: updated_at
+        direction: DESC
+    limit: 20
+    columnSize:
+      file.name: 260
+  - type: table
+    name: Gaps
+    filters:
+      and:
+        - or:
+            - '!file.hasProperty("repo")'
+            - '!file.hasProperty("commit")'
+            - '!file.hasProperty("description")'
+    order:
+      - formula.kind
+      - file.name
+      - repo
+      - commit
+    columnSize:
+      file.name: 260

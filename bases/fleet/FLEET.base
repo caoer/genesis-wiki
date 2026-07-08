@@ -1,0 +1,30 @@
+filters:
+  and:
+    - file.hasTag("type/agent")
+formulas:
+  handoff_from: note["handoff-from"]
+views:
+  - type: fleet-view
+    name: Fleet
+    order:
+      - file.name
+      - role
+      - roster
+      - tags
+      - type
+      - manifest
+    showManifest: true
+    showStatus: true
+    showTags: false
+    showType: false
+  - type: table
+    name: Fleet table
+    groupBy:
+      property: file.folder
+      direction: ASC
+    order:
+      - file.name
+      - role
+      - status
+      - host
+      - formula.handoff_from

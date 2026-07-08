@@ -1,0 +1,113 @@
+filters:
+  and:
+    - file.path.contains("sources/git/")
+    - file.ext == "md"
+formulas:
+  commit_short: if(commit, commit.slice(0, 7), "")
+  upstream_commit_short: if(note["upstream-commit"], note["upstream-commit"].slice(0, 7), "")
+  repo_folder: file.folder.split("/").reverse()[0]
+properties:
+  file.name:
+    displayName: Repo
+  description:
+    displayName: Description
+  ownership:
+    displayName: Ownership
+  branch:
+    displayName: Branch
+  note.domain-candidates:
+    displayName: Domain candidates
+  nested:
+    displayName: Nested
+  upstream:
+    displayName: Upstream
+  note.upstream-branch:
+    displayName: Upstream branch
+  formula.commit_short:
+    displayName: Commit
+  formula.upstream_commit_short:
+    displayName: Merge base
+  formula.repo_folder:
+    displayName: Repo
+  created:
+    displayName: Created
+  file.mtime:
+    displayName: Modified
+views:
+  - type: table
+    name: Catalog
+    filters:
+      and:
+        - file.hasTag("type/repo")
+    groupBy:
+      property: ownership
+      direction: ASC
+    order:
+      - file.name
+      - description
+      - domain-candidates
+      - branch
+      - formula.commit_short
+    columnSize:
+      note.description: 147
+      note.domain-candidates: 404
+      note.branch: 385
+  - type: table
+    name: Fork sync
+    filters:
+      and:
+        - file.hasTag("type/repo")
+        - ownership == "forked"
+    order:
+      - file.name
+      - branch
+      - upstream-branch
+      - formula.upstream_commit_short
+      - formula.commit_short
+      - upstream
+      - description
+  - type: table
+    name: Mega-repos
+    filters:
+      and:
+        - file.hasTag("type/repo")
+        - file.hasProperty("nested")
+    order:
+      - file.name
+      - nested
+      - description
+  - type: table
+    name: Recent captures
+    filters:
+      and:
+        - '!file.hasTag("type/repo")'
+        - file.name != "GIT"
+    groupBy:
+      property: created
+      direction: DESC
+    order:
+      - file.name
+      - formula.repo_folder
+      - created
+      - file.mtime
+      - file.ctime
+    sort:
+      - property: file.ctime
+        direction: ASC
+    limit: 30
+  - type: table
+    name: Gaps
+    filters:
+      and:
+        - file.hasTag("type/repo")
+        - or:
+            - '!file.hasProperty("description")'
+            - '!file.hasProperty("domain-candidates")'
+            - '!file.hasProperty("commit")'
+            - '!file.hasProperty("ownership")'
+    order:
+      - file.name
+      - description
+      - domain-candidates
+      - formula.commit_short
+      - ownership

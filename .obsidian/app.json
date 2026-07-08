@@ -1,0 +1,18 @@
+{
+  "readableLineLength": false,
+  "showInlineTitle": false,
+  "alwaysUpdateLinks": true,
+  "trashOption": "local",
+  "userIgnoreFilters": [
+    "/^sessions\\/(?!.*\\/(agents|tasks|decisions)\\/)/",
+    "foreign/",
+    "node_modules/",
+    ".direnv/",
+    "result",
+    "result-*",
+    "dist/"
+  ],
+  "newFileLocation": "folder",
+  "newFileFolderPath": "inbox/_unstaged",
+  "attachmentFolderPath": "inbox/_unstaged"
+}

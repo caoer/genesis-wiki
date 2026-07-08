@@ -1,0 +1,19 @@
+# Gitleaks config — pre-commit secrets-scan (driven by lefthook.yml).
+# Extends the default ~180-rule set; local additions are allowlists only.
+
+[extend]
+useDefault = true
+
+[allowlist]
+# Vendored Obsidian plugin/theme builds (*.js/*.css) are scan-exempt — base64 fonts and
+# minified JS false-positive on entropy patterns. data.json and all other plugin files
+# remain scanned. Wiki knowledge articles contain protocol names, session IDs, commit
+# hashes, and technical terms that false-positive on entropy-based generic-api-key rules;
+# compound sources and session artifacts are knowledge, not credentials.
+description = "Vendored Obsidian plugin/theme builds + wiki knowledge content"
+paths = [
+  '''\.obsidian/plugins/.*\.(js|css)$''',
+  '''\.obsidian/themes/.*\.css$''',
+  '''sources/compound/.*\.md$''',
+  '''sessions/.*\.md$''',
+]

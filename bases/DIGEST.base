@@ -1,0 +1,64 @@
+filters:
+  and:
+    - file.ext == "md"
+    - '!file.path.contains("logs/")'
+    - '!file.path.contains("sessions/")'
+formulas:
+  where: file.folder
+properties:
+  file.name:
+    displayName: Page
+  formula.where:
+    displayName: Where
+  created:
+    displayName: Created
+  updated:
+    displayName: Last marked
+views:
+  - type: table
+    name: Open questions
+    filters:
+      and:
+        - file.hasTag("has/open-question")
+    order:
+      - file.name
+      - formula.where
+      - created
+  - type: table
+    name: Incorporation debt
+    filters:
+      and:
+        - file.path.contains("sources/")
+        - file.hasTag("do/incorporate")
+    order:
+      - file.name
+      - formula.where
+      - created
+  - type: table
+    name: New
+    filters:
+      and:
+        - created >= today() - "7d"
+    groupBy:
+      property: created
+      direction: DESC
+    order:
+      - file.name
+      - formula.where
+      - created
+  - type: table
+    name: Stale
+    filters:
+      and:
+        - file.hasProperty("updated")
+        - updated <= today() - "60d"
+        - '!file.hasTag("status/archived")'
+        - '!file.hasTag("status/retired")'
+        - or:
+            - file.hasTag("type/reference")
+            - file.hasTag("type/index")
+            - file.hasTag("type/domain-index")
+    order:
+      - file.name
+      - formula.where
+      - updated

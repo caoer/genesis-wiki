@@ -1,0 +1,47 @@
+filters:
+  and:
+    - file.inFolder("decisions")
+    - file.ext == "md"
+    - '!file.name.contains("DECISIONS")'
+properties:
+  status:
+    displayName: Status
+  type:
+    displayName: Type
+  created:
+    displayName: Created
+  tags:
+    displayName: Tags
+views:
+  - type: table
+    name: All Decisions
+    filters:
+      and:
+        - '!file.inFolder("decisions/ambig")'
+    order:
+      - file.name
+      - status
+      - type
+      - created
+      - tags
+      - file.ctime
+      - file.mtime
+    sort:
+      - property: file.ctime
+        direction: DESC
+      - property: created
+        direction: DESC
+      - property: status
+        direction: ASC
+  - type: table
+    name: Ambig queue
+    filters:
+      and:
+        - file.inFolder("decisions/ambig")
+    order:
+      - file.name
+      - status
+      - created
+    sort:
+      - property: file.name
+        direction: ASC

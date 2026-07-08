@@ -1,0 +1,135 @@
+filters:
+  and:
+    - file.path.contains("sources/")
+    - '!file.path.contains("sources/git/")'
+    - '!file.path.contains("sources/compound/")'
+    - file.ext == "md"
+    - file.name != "SOURCES"
+formulas:
+  bucket: file.folder.split("/").reverse()[0]
+  class: if(file.path.contains("sources/example-entity/"), "entity", "provenance")
+properties:
+  file.name:
+    displayName: Page
+  formula.bucket:
+    displayName: Bucket
+  formula.class:
+    displayName: Class
+  class:
+    displayName: Class
+  description:
+    displayName: Description
+  source:
+    displayName: Source
+  created:
+    displayName: Created
+  file.mtime:
+    displayName: Modified
+views:
+  - type: table
+    name: Buckets
+    filters:
+      and:
+        - note.type == "bucket"
+    groupBy:
+      property: class
+      direction: ASC
+    order:
+      - file.name
+      - description
+      - formula.bucket
+    columnSize:
+      file.name: 200
+      note.description: 620
+  - type: table
+    name: Masters
+    filters:
+      and:
+        - note.type == "bucket"
+    order:
+      - file.name
+      - formula.class
+      - formula.bucket
+    sort:
+      - property: file.name
+        direction: ASC
+    columnSize:
+      file.name: 200
+  - type: table
+    name: Folder
+    filters:
+      and:
+        - file.folder == this.file.folder
+        - note.type != "bucket"
+    order:
+      - file.name
+      - source
+      - created
+    columnSize:
+      file.name: 360
+  - type: table
+    name: By bucket
+    filters:
+      and:
+        - note.type != "bucket"
+    groupBy:
+      property: formula.bucket
+      direction: ASC
+    order:
+      - file.name
+      - source
+      - created
+    columnSize:
+      file.name: 320
+  - type: table
+    name: Entities
+    filters:
+      and:
+        - formula.class == "entity"
+        - note.type != "bucket"
+    groupBy:
+      property: formula.bucket
+      direction: ASC
+    order:
+      - file.name
+      - source
+      - created
+  - type: table
+    name: Provenance
+    filters:
+      and:
+        - formula.class == "provenance"
+        - note.type != "bucket"
+    groupBy:
+      property: formula.bucket
+      direction: ASC
+    order:
+      - file.name
+      - source
+      - created
+  - type: table
+    name: Recent
+    filters:
+      and:
+        - note.type != "bucket"
+    groupBy:
+      property: created
+      direction: DESC
+    order:
+      - file.name
+      - formula.bucket
+      - created
+    limit: 10
+  - type: table
+    name: Gaps
+    filters:
+      and:
+        - note.type != "bucket"
+        - or:
+            - '!file.hasProperty("source")'
+            - '!file.hasProperty("created")'
+    order:
+      - file.name
+      - formula.bucket
+      - source
+      - created
