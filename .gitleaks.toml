@@ -1,0 +1,14 @@
+# Gitleaks config — secrets-scan for the public genesis-wiki (contract C41 genesis-public:
+# no private content ever lands in upstream; this scan is part of the public lint pack, C45).
+
+[extend]
+useDefault = true
+
+[allowlist]
+# Vendored Obsidian plugin/theme builds (*.js/*.css) are scan-exempt — base64 fonts and
+# minified JS false-positive on entropy patterns. Everything else is scanned.
+description = "Vendored Obsidian plugin/theme builds"
+paths = [
+  '''\.obsidian/plugins/.*\.(js|css)$''',
+  '''\.obsidian/themes/.*\.css$''',
+]
