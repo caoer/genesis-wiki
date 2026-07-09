@@ -6,22 +6,18 @@ md-install: "[[INSTALL#^install]]"
 md-install-args: "target"
 md-bootstrap: "[[INSTALL#^bootstrap]]"
 md-bootstrap-args: "target"
-md-install-example: "[[INSTALL#^install-example]]"
-md-install-example-args: "target"
-md-show-diff-commits: "[[INSTALL#^show-diff-commits]]"
-md-show-diff-commits-args: "target"
 tags: [domain/contract, type/reference]
 created: 2026-07-09
-description: "The genesis birth+converge engine as one md-run literate page — successor of the retired `ccc-cli wiki init` executor. Renders the seed tree + materialized contract into a target wiki (birth) or converges an existing wiki to a genesis pin (adjudicated diff), no compiled code."
+description: "The genesis birth+install engine as one md-run literate page — renders the genesis template into a target folder: birth into an empty dir, adjudicated per-file diff into an existing wiki, re-run to update. No compiled code, no pin chain."
 ---
 
-# INSTALL — genesis birth + converge engine
+# INSTALL — genesis birth + install engine
 
-This page **is** the birth executor. It scaffolds a new llm-wiki from the seed
-tree (`^bootstrap`), converges an existing wiki toward this genesis pin with an
-adjudicated diff (`^install`), and inspects a target read-only (`^check`) — all
-as `md run` tasks, no compiled `ccc-cli wiki init`. The **pin** is this genesis
-clone's `HEAD`; the payload is what that commit ships.
+This page **is** the install executor. It renders the genesis template into a
+target folder: an empty/missing target gets a clean birth (`^bootstrap`), an
+existing wiki gets an adjudicated per-file diff (`^install`), and `^check`
+inspects a target read-only — all as `md run` tasks, no compiled code.
+**Re-run to update**: every run re-renders and re-diffs from scratch.
 
 ## Model (contract-anchored)
 
@@ -33,20 +29,19 @@ clone's `HEAD`; the payload is what that commit ships.
 - **cwd is the genesis clone, never the target.** Every `git` invocation is
   `git -C <dir>`; every target path is absolute. Blocks run as `bash -euo
   pipefail` temp scripts (`md run`), `args` arrive as `$1 $2 …`.
-- **Pin record (contract C13/C14, decision #4).** A born/converged wiki records
-  the pin in its commit: subject `genesis-wiki(<40hex>): <what>` **and** trailer
-  `Genesis-Wiki-Pin: <40hex>`. Detection prefers the trailer, falls back to a
-  `--fixed-strings` subject grep; a shallow target fails loud (silent-empty
-  history would forge a wrong pin).
-- **Converge is agent-adjudicated.** `^install` renders → diffs → copies the
-  safe classes → **holds back the diverged-root class (refuse-by-default)** →
-  installs hooks → prints instructions. It **never commits**: the adjudicating
-  agent reviews the dirty tree and commits. Re-invocation is stateless
-  (re-render + re-diff from scratch; an abandoned run is just a dirty tree the
-  guard reports).
+- **No pin chain.** A wiki's genesis provenance is the human-readable birth
+  commit message (`birth: <slug> from genesis@<sha>`) — reference prose for a
+  reader, never a detection mechanism. Nothing walks history; nothing is ever
+  proposed for removal — files in the target that the template does not ship
+  are the wiki's own instance content, full stop.
+- **Install is agent-adjudicated for existing wikis.** `^install` renders →
+  diffs → copies the safe classes → **holds back the diverged-root class
+  (refuse-by-default)** → installs hooks → prints instructions. It **never
+  commits**: the adjudicating agent reviews the dirty tree and commits. An
+  abandoned run is just a dirty tree the guard reports.
 - **Exit convention.** `0` ok · `1` task-failed. Never `2` (reserved by `md`
-  for resolution-failure — do not overload). The converge end-state is the
-  final line `CONVERGE-STATUS: at-pin | pending-adjudication`.
+  for resolution-failure — do not overload). The end-state is the final line
+  `CONVERGE-STATUS: in-sync | pending-adjudication`.
 
 ## Usage
 
@@ -55,35 +50,36 @@ clone's `HEAD`; the payload is what that commit ships.
 env -i PATH="$PATH" HOME="$HOME" CCC_LLM_WIKI_PATH=/abs/target \
   md run '{"file":"/abs/genesis/INSTALL.md","name":"check","args":["/abs/target"]}'
 
-# converge an existing wiki toward this pin (adjudicated; nothing committed)
+# install into an existing wiki (adjudicated; nothing committed)
 env -i PATH="$PATH" HOME="$HOME" \
   md run '{"file":"/abs/genesis/INSTALL.md","name":"install","args":["/abs/target"]}'
-#   args: [target, params-file?, accept-root-list?, prior-pin?]
+#   args: [target, params-file?, accept-root-list?]
 
-# birth a fresh wiki into an empty/new dir, then the pin commit
+# birth a fresh wiki into an empty/new dir, then the birth commit
 env -i PATH="$PATH" HOME="$HOME" \
   md run '{"file":"/abs/genesis/INSTALL.md","name":"bootstrap","args":["/abs/new-wiki"]}'
 #   args: [target, params-file?]
 ````
 
-**Env posture (decision #17).** Converge blocks are meant to run under a
+**Env posture (decision #17).** Install blocks are meant to run under a
 **scrubbed** env (`env -i PATH=… HOME=… <declared vars>`), never full
 inheritance — the only declared variable is `CCC_LLM_WIKI_PATH` (`^check` only).
 `--no-verify` is banned: `^install` activates the role's hook and the birth
 commit passes through it.
 
-**Named gaps.** Converge **requires an interactive adjudicating agent**;
-headless/CI invocation is out of scope. Executed blocks have no content-level
-sandbox — the env scrub + the invoking agent's permission scope bound egress.
+**Named gaps.** Install into an existing wiki **requires an interactive
+adjudicating agent**; headless/CI invocation is out of scope. Executed blocks
+have no content-level sandbox — the env scrub + the invoking agent's permission
+scope bound egress.
 
 ## `^check` — read-only doctor
 
 Reports posture; writes nothing. Fails (`exit 1`) only when a precondition makes
-converge untrustworthy (missing tool, bad target, shallow clone). Everything
+install untrustworthy (missing tool, bad target, shallow clone). Everything
 else is a `WARN`/posture line at `exit 0`.
 
 ````bash
-# ^check — read-only doctor for a converge/birth target. args: [target]
+# ^check — read-only doctor for an install/birth target. args: [target]
 target="${1:?FAIL[check]: missing required arg: target (absolute path)}"
 case "$target" in /*) : ;; *) echo "FAIL[check]: target must be absolute: $target" >&2; exit 1 ;; esac
 genesis="$(git -C . rev-parse --show-toplevel)"           # cwd = the genesis clone
@@ -99,36 +95,22 @@ if [ ! -e "$target" ]; then echo "target: does not exist yet (birth candidate)";
 elif [ ! -e "$target/.git" ]; then
   [ -z "$(ls -A "$target" 2>/dev/null)" ] && echo "target: empty non-git dir (birth candidate)" || { echo "FAIL[check]: target non-empty and not a git repo" >&2; fails=$((fails+1)); }
 else
-  # 3. shallow guard — a shallow clone silently drops history and forges a wrong pin
+  # 3. shallow guard — a shallow clone has incomplete history; unshallow before operating on it
   if [ "$(git -C "$target" rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]; then
-    echo "FAIL[check]: target is a shallow clone — unshallow before converge" >&2; fails=$((fails+1))
+    echo "FAIL[check]: target is a shallow clone — unshallow before install" >&2; fails=$((fails+1))
   fi
   dirty="$(git -C "$target" status --porcelain 2>/dev/null)"
-  [ -z "$dirty" ] && echo "tree: clean" || printf 'WARN[check]: target tree is DIRTY (converge refuses until clean):\n%s\n' "$dirty"
+  [ -z "$dirty" ] && echo "tree: clean" || printf 'WARN[check]: target tree is DIRTY (install refuses until clean):\n%s\n' "$dirty"
+
+  # 4. security config presence — .gitleaks.toml/.gitignore ship in the template; lefthook.yml is role-owned
+  for f in .gitleaks.toml .gitignore; do
+    [ -f "$seeds/$f" ] || continue
+    [ -f "$target/$f" ] && echo "posture: $f present" || echo "POSTURE[check]: $f ABSENT in target (template ships it) — security config missing"
+  done
+  [ -f "$target/lefthook.yml" ] && echo "posture: lefthook.yml present (role-owned)" || echo "posture: lefthook.yml absent (private role, or hooks not yet installed)"
 fi
 
-# 4. recorded-pin vs running-pin ancestry — detect an older-pin-over-newer-wiki converge
-running_pin="$(git -C "$genesis" rev-parse HEAD)"
-recorded_pin=""
-if [ -e "$target/.git" ] && [ "$(git -C "$target" rev-parse --is-shallow-repository 2>/dev/null)" != "true" ]; then
-  recorded_pin="$(git -C "$target" log --no-merges --format='%(trailers:key=Genesis-Wiki-Pin,valueonly)' 2>/dev/null | grep -m1 -E '^[0-9a-f]{40}$' || true)"
-  [ -z "$recorded_pin" ] && recorded_pin="$(git -C "$target" log --no-merges --fixed-strings --grep='genesis-wiki(' --format='%s' 2>/dev/null | sed -n 's/^genesis-wiki(\([0-9a-f]\{7,40\}\)).*/\1/p' | head -1 || true)"
-fi
-if [ -z "$recorded_pin" ]; then echo "pin: no Genesis-Wiki-Pin record in target (adoption / pre-INSTALL wiki)";
-elif [ "$recorded_pin" = "$running_pin" ]; then echo "pin: recorded == running ($running_pin) — at pin";
-elif git -C "$genesis" merge-base --is-ancestor "$recorded_pin" "$running_pin" 2>/dev/null; then echo "pin: recorded $recorded_pin is an ancestor of running $running_pin — forward converge OK";
-else echo "WARN[check]: recorded pin $recorded_pin is NOT an ancestor of running $running_pin — older-pin or divergent converge; review before applying"; fi
-
-# 5. security posture by CONTENT-HASH, never the pin marker — .gitleaks.toml/.gitignore ship in payload; lefthook.yml is role-owned
-for f in .gitleaks.toml .gitignore; do
-  [ -f "$seeds/$f" ] || continue
-  if [ ! -f "$target/$f" ]; then echo "POSTURE[check]: $f ABSENT in target (payload ships it) — security config missing";
-  elif [ "$(git -C "$seeds" hash-object "$f")" = "$(git -C "$target" hash-object "$f")" ]; then echo "posture: $f matches payload";
-  else echo "POSTURE-DRIFT[check]: $f differs from payload content-hash — review before trusting security posture"; fi
-done
-[ -f "$target/lefthook.yml" ] && echo "posture: lefthook.yml present (role-owned; not payload-governed)" || echo "posture: lefthook.yml absent (private role, or hooks not yet installed)"
-
-# 6. env printout — CCC_LLM_WIKI_PATH shadowing (multi-wiki host; R13/R14 recurrence)
+# 5. env printout — CCC_LLM_WIKI_PATH shadowing (multi-wiki host; R13/R14 recurrence)
 if [ "$(cd "$CCC_LLM_WIKI_PATH" 2>/dev/null && pwd -P)" = "$(cd "$target" 2>/dev/null && pwd -P)" ]; then
   echo "env: CCC_LLM_WIKI_PATH resolves to target — nested md calls hit the right wiki"
 else
@@ -140,39 +122,37 @@ fi
 
 ^check
 
-## `^install` — render, diff, converge (no commit)
+## `^install` — render, diff, install (no commit)
 
-Birth (empty/missing target) or converge (existing clean wiki). Renders the
-payload into a `0700` tmp dir, diffs against the target, prints the grouped
+Birth (empty/missing target) or update (existing clean wiki). Renders the
+template into a `0700` tmp dir, diffs against the target, prints the grouped
 summary, copies the safe classes, holds back the diverged-root class, installs
 the role hook. **Never commits.**
 
-`args: [target, params-file?, accept-root-list?, prior-pin?]` — `params-file`
-supplies birth tokens (empty target); `accept-root-list` is a space-separated
-set of diverged-root paths to accept this run; `prior-pin` supplies a removal
-baseline when the target carries no pin record.
+`args: [target, params-file?, accept-root-list?]` — `params-file` supplies
+birth tokens (empty target); `accept-root-list` is a space-separated set of
+diverged-root paths to accept this run.
 
 ````bash
-# ^install — render+diff+converge a target toward this genesis pin; no commit. args: [target, params-file?, accept-root?, prior-pin?]
+# ^install — render+diff+install the genesis template into a target; no commit. args: [target, params-file?, accept-root?]
 target="${1:?FAIL[install]: missing required arg: target (absolute path)}"
-params_file="${2:-}"; accept_root=" ${3:-} "; prior_pin="${4:-}"
+params_file="${2:-}"; accept_root=" ${3:-} "
 case "$target" in /*) : ;; *) echo "FAIL[install]: target must be absolute: $target" >&2; exit 1 ;; esac
 genesis="$(git -C . rev-parse --show-toplevel)"           # cwd = the genesis clone
 seeds="$genesis/domains/contract/seeds"; contract="$genesis/domains/contract/genesis-contract"
-running_pin="$(git -C "$genesis" rev-parse HEAD)"
+genesis_sha="$(git -C "$genesis" rev-parse HEAD)"
 
 # --- target guard: git-init only if empty/missing, else demand a clean tree ---
 if [ ! -e "$target" ] || { [ -d "$target" ] && [ -z "$(ls -A "$target" 2>/dev/null)" ]; }; then
   mkdir -p "$target"; [ -e "$target/.git" ] || git -C "$target" init -q
 elif [ -e "$target/.git" ]; then
-  [ "$(git -C "$target" rev-parse --is-shallow-repository 2>/dev/null)" = "true" ] && { echo "FAIL[install]: target is shallow — unshallow first" >&2; exit 1; }
   dirty="$(git -C "$target" status --porcelain 2>/dev/null)"
   [ -n "$dirty" ] && { printf 'FAIL[install]: target tree is DIRTY (commit/stash first; untracked counts):\n%s\n' "$dirty" >&2; exit 1; }
 else
   echo "FAIL[install]: target non-empty and not a git repo — refusing: $target" >&2; exit 1
 fi
 
-# --- resolve substitution params: converge reads target frontmatter; birth reads params-file / defaults ---
+# --- resolve substitution params: existing wiki reads target frontmatter; birth reads params-file / defaults ---
 llm="$target/LLM_WIKI.md"
 fmval() { sed -n "s/^$1:[[:space:]]*//p" "$2" 2>/dev/null | head -1 | sed -e 's/[[:space:]]*#.*$//' -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'\$/\1/" -e 's/[[:space:]]*$//'; }
 slug=""; role=""; ref_block="[]"; identity=""; fork_url=""; upstream_url=""; born_date="$(date +%F)"
@@ -237,7 +217,7 @@ PY
 residue="$(find "$payload" -type f \( -name '*.md' -o -name '*.yaml' -o -name '*.yml' -o -name '*.toml' \) -not -path "$payload/domains/example/*" -exec grep -Hn '{{' {} + 2>/dev/null || true)"
 [ -n "$residue" ] && { printf 'FAIL[install]: unresolved {{token}} residue after render (aborting before copy):\n%s\n' "$residue" >&2; exit 1; }
 
-# --- diff: classify every payload path against the target ---
+# --- diff: classify every template path against the target (target-only files are instance content — never touched, never listed) ---
 ROOT_CLASS=" SCHEMA.md CLAUDE.md LLM_WIKI.md meridian.yaml .gitignore .gitleaks.toml lefthook.yml "
 added=(); changed=(); changed_root=()
 while IFS= read -r rel; do
@@ -248,25 +228,8 @@ while IFS= read -r rel; do
   else changed+=("$rel"); fi
 done < <(cd "$payload" && find . -type f | sed 's|^\./||' | sort)
 
-# --- removals: payload@recorded-pin minus payload@running-pin, still present in target (decision #6) ---
-recorded_pin="$(git -C "$target" log --no-merges --format='%(trailers:key=Genesis-Wiki-Pin,valueonly)' 2>/dev/null | grep -m1 -E '^[0-9a-f]{40}$' || true)"
-[ -z "$recorded_pin" ] && recorded_pin="$(git -C "$target" log --no-merges --fixed-strings --grep='genesis-wiki(' --format='%s' 2>/dev/null | sed -n 's/^genesis-wiki(\([0-9a-f]\{7,40\}\)).*/\1/p' | head -1 || true)"
-[ -z "$recorded_pin" ] && recorded_pin="$prior_pin"
-removed=(); removal_skipped=""
-payload_rels() { # payload_rels <pin>: emit target-root rel paths shipped at <pin>
-  git -C "$genesis" ls-tree -r --name-only "$1" -- domains/contract/seeds domains/contract/genesis-contract 2>/dev/null \
-    | sed -e '\|^domains/contract/seeds/README.md$|d' -e 's|^domains/contract/seeds/||'
-}
-if [ -n "$recorded_pin" ] && [ "$recorded_pin" != "$running_pin" ]; then
-  while IFS= read -r rel; do
-    [ -z "$rel" ] && continue
-    grep -qxF "$rel" <(payload_rels "$running_pin") && continue                           # still shipped — not a removal
-    [ -e "$target/$rel" ] && removed+=("$rel")
-  done < <(payload_rels "$recorded_pin")
-elif [ -z "$recorded_pin" ]; then removal_skipped="no recorded pin and no prior-pin arg"; fi
-
-# --- print the grouped diff summary (harness-asserted format, decision #9) ---
-echo "=== GENESIS CONVERGE DIFF — $slug @ ${running_pin:0:12} ==="
+# --- print the grouped diff summary ---
+echo "=== GENESIS INSTALL DIFF — $slug @ genesis ${genesis_sha:0:12} ==="
 echo "resolved params: slug=$slug role=$role born=$born_date fork-remote=${fork_url:-<none>}"
 echo
 echo "ADDED (${#added[@]}):";        for r in "${added[@]}"; do echo "  + $r"; done
@@ -294,16 +257,9 @@ for k in a:
 PY
   case "$accept_root" in *" $r "*) : ;; *) echo "      accept: re-run with accept-root arg containing \"$r\"" ;; esac
 done
-echo "REMOVED (${#removed[@]})${removal_skipped:+ — SKIPPED: $removal_skipped}:"
-for r in "${removed[@]}"; do
-  why="$(git -C "$genesis" log --no-merges --diff-filter=D --format='%s' "$recorded_pin".."$running_pin" -- "domains/contract/seeds/$r" "domains/contract/genesis-contract/$r" 2>/dev/null | head -1)"
-  echo "  - $r   reason: ${why:-removed from payload between pins}"
-  echo "      apply:     git -C \"$target\" rm \"$r\""
-  echo "      resurrect: git -C \"$target\" checkout HEAD -- \"$r\""
-done
 echo
 
-# --- copy-all-override: apply ADDED + CHANGED(non-root) + accepted CHANGED-ROOT; hold back refused root; never auto-remove ---
+# --- copy: apply ADDED + CHANGED(non-root) + accepted CHANGED-ROOT; hold back refused root ---
 apply() { mkdir -p "$target/$(dirname "$1")"; cp "$payload/$1" "$target/$1"; }
 for r in "${added[@]}"   "${changed[@]}"; do apply "$r"; done
 held=0
@@ -328,26 +284,27 @@ case "$role" in
 esac
 
 # --- end-state ---
-total=$(( ${#added[@]} + ${#changed[@]} + ${#changed_root[@]} + ${#removed[@]} ))
+total=$(( ${#added[@]} + ${#changed[@]} + ${#changed_root[@]} ))
 echo
 if [ "$total" -eq 0 ]; then
-  echo "CONVERGE-STATUS: at-pin"
+  echo "CONVERGE-STATUS: in-sync"
 else
-  echo "Adjudicate: review the CHANGED-ROOT field deltas and REMOVED proposals above; the working tree now carries the safe classes."
-  echo "When satisfied, commit as the adjudicating agent:"
-  echo "  git -C \"$target\" add -A && git -C \"$target\" commit -m \"genesis-wiki($running_pin): converge $slug\" -m \"Genesis-Wiki-Pin: $running_pin\""
+  echo "Adjudicate: review the CHANGED-ROOT field deltas above; the working tree now carries the safe classes."
+  echo "When satisfied, review and commit as the adjudicating agent, e.g.:"
+  echo "  git -C \"$target\" add <reviewed paths> && git -C \"$target\" commit -m \"genesis install: update $slug from genesis@${genesis_sha:0:12}\""
   echo "CONVERGE-STATUS: pending-adjudication"
 fi
 ````
 
 ^install
 
-## `^bootstrap` — fresh-dir birth + pin commit
+## `^bootstrap` — fresh-dir birth + birth commit
 
 Fresh birth only (refuses a non-empty target — use `^install` for an existing
 wiki). Delegates scaffolding to `^install` in birth mode, then writes the birth
-commit with the pin subject + trailer. **No `--no-verify`** — the role hook (if
-any) runs on the birth tree.
+commit. The commit message names the genesis sha as **human reference prose** —
+provenance for a reader, never a detection mechanism. **No `--no-verify`** —
+the role hook (if any) runs on the birth tree.
 
 `args: [target, params-file?]` — the params-file carries birth tokens
 (`SLUG`, `ROLE`, `FORK_REMOTE_URL`, `IDENTITY_FILE`, `REFERENCE_WIKIS_FILE`, …);
@@ -355,7 +312,7 @@ absent, documented defaults apply (`role=private`, `reference-wikis=[]`, slug =
 target basename, identity a placeholder, upstream = genesis remote).
 
 ````bash
-# ^bootstrap — birth a fresh wiki, then the pin commit. args: [target, params-file?]
+# ^bootstrap — birth a fresh wiki, then the birth commit. args: [target, params-file?]
 target="${1:?FAIL[bootstrap]: missing required arg: target (absolute path)}"
 params_file="${2:-}"
 case "$target" in /*) : ;; *) echo "FAIL[bootstrap]: target must be absolute: $target" >&2; exit 1 ;; esac
@@ -363,76 +320,19 @@ if [ -e "$target" ] && [ -n "$(ls -A "$target" 2>/dev/null)" ]; then
   echo "FAIL[bootstrap]: target not empty — use ^install for an existing wiki: $target" >&2; exit 1
 fi
 genesis="$(git -C . rev-parse --show-toplevel)"           # cwd = the genesis clone
-running_pin="$(git -C "$genesis" rev-parse HEAD)"
+genesis_sha="$(git -C "$genesis" rev-parse HEAD)"
 slug="$(basename "$target")"
 
 # delegate scaffolding (repo-init + render + copy + hooks) to ^install in birth mode; </dev/null on the nested md call
 json="$(python3 -c 'import json,sys; print(json.dumps({"file":sys.argv[1],"name":"install","args":[sys.argv[2],sys.argv[3]]}))' "$genesis/INSTALL.md" "$target" "$params_file")"
 md run "$json" </dev/null || { echo "FAIL[bootstrap]: nested install failed" >&2; exit 1; }
 
-# birth commit — pin subject + trailer (decision #4); no --no-verify (decision #17): the just-installed hook runs
+# birth commit — human-reference provenance in the message; no --no-verify (decision #17): the just-installed hook runs
 git -C "$target" add -A
-git -C "$target" commit -q -m "genesis-wiki($running_pin): birth $slug" -m "Genesis-Wiki-Pin: $running_pin" \
+git -C "$target" commit -q -m "birth: $slug from genesis@$genesis_sha" \
   || { echo "FAIL[bootstrap]: birth commit failed (hook rejection? fix and re-commit — --no-verify is banned)" >&2; exit 1; }
-echo "BOOTSTRAP: born $slug at pin $running_pin"
+echo "BOOTSTRAP: born $slug from genesis@$genesis_sha"
 echo "next (team/public only): if hooks were not activated, install lefthook and re-run \`md run install\` to activate before the next commit"
 ````
 
 ^bootstrap
-
-## `^install-example` — install-once teaching examples
-
-No-op unless the target carries a `Genesis-Wiki-Pin` record (a genesis-born
-wiki). For a born wiki, restores each example path to its committed state —
-respecting a committed deletion (the wiki decided). The in-block path list **is**
-the install-once definition.
-
-````bash
-# ^install-example — restore install-once teaching examples to committed state (born wikis only). args: [target]
-target="${1:?FAIL[install-example]: missing required arg: target (absolute path)}"
-case "$target" in /*) : ;; *) echo "FAIL[install-example]: target must be absolute: $target" >&2; exit 1 ;; esac
-[ -e "$target/.git" ] || { echo "FAIL[install-example]: target is not a git repo: $target" >&2; exit 1; }
-[ "$(git -C "$target" rev-parse --is-shallow-repository 2>/dev/null)" = "true" ] && { echo "FAIL[install-example]: target is shallow — unshallow first" >&2; exit 1; }
-
-# the install-once definition — the teaching example domain shipped by the seed tree
-EXAMPLE_PATHS="domains/example/pour-over-coffee/POUR-OVER-COFFEE.md domains/example/pour-over-coffee/grind-size.md"
-
-pin="$(git -C "$target" log --no-merges --format='%(trailers:key=Genesis-Wiki-Pin,valueonly)' 2>/dev/null | grep -m1 -E '^[0-9a-f]{40}$' || true)"
-[ -z "$pin" ] && pin="$(git -C "$target" log --no-merges --fixed-strings --grep='genesis-wiki(' --format='%s' 2>/dev/null | sed -n 's/^genesis-wiki(\([0-9a-f]\{7,40\}\)).*/\1/p' | head -1 || true)"
-if [ -z "$pin" ]; then echo "install-example: no Genesis-Wiki-Pin record — no-op (not a genesis-born wiki)"; exit 0; fi
-
-for p in $EXAMPLE_PATHS; do
-  if git -C "$target" cat-file -e "HEAD:$p" 2>/dev/null; then
-    git -C "$target" checkout HEAD -- "$p" && echo "install-example: restored $p"
-  else
-    echo "install-example: $p not in HEAD (deliberately removed) — respected"
-  fi
-done
-````
-
-^install-example
-
-## `^show-diff-commits` — the C16 backfill guide
-
-`git log <recorded-pin>..<running-pin>` over the genesis clone, surfacing each
-commit's `Change-note:` trailer — the change list an adjudicating agent walks
-when converging a target forward.
-
-````bash
-# ^show-diff-commits — recorded-pin..running-pin change list with Change-note trailers. args: [target]
-target="${1:?FAIL[show-diff-commits]: missing required arg: target (absolute path)}"
-case "$target" in /*) : ;; *) echo "FAIL[show-diff-commits]: target must be absolute: $target" >&2; exit 1 ;; esac
-genesis="$(git -C . rev-parse --show-toplevel)"           # cwd = the genesis clone
-[ "$(git -C "$genesis" rev-parse --is-shallow-repository 2>/dev/null)" = "true" ] && { echo "FAIL[show-diff-commits]: genesis clone is shallow — the range would be wrong; unshallow first" >&2; exit 1; }
-running_pin="$(git -C "$genesis" rev-parse HEAD)"
-
-recorded_pin="$(git -C "$target" log --no-merges --format='%(trailers:key=Genesis-Wiki-Pin,valueonly)' 2>/dev/null | grep -m1 -E '^[0-9a-f]{40}$' || true)"
-[ -z "$recorded_pin" ] && recorded_pin="$(git -C "$target" log --no-merges --fixed-strings --grep='genesis-wiki(' --format='%s' 2>/dev/null | sed -n 's/^genesis-wiki(\([0-9a-f]\{7,40\}\)).*/\1/p' | head -1 || true)"
-if [ -z "$recorded_pin" ]; then echo "show-diff-commits: no recorded pin in target — nothing to range against" >&2; exit 1; fi
-if [ "$recorded_pin" = "$running_pin" ]; then echo "show-diff-commits: recorded == running ($running_pin) — target already at pin, no diff commits"; exit 0; fi
-
-echo "=== genesis commits $recorded_pin..$running_pin (backfill guide, C16) ==="
-git -C "$genesis" log --no-merges --format='%h %s%n    Change-note: %(trailers:key=Change-note,valueonly,separator= )' "$recorded_pin".."$running_pin"
-````
-
-^show-diff-commits
