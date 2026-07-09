@@ -160,12 +160,20 @@ else
   echo "FAIL[install]: target non-empty and not a git repo — refusing: $target" >&2; exit 1
 fi
 
+# --- R2 (contract C23-no-mounts): refuse ANY in-vault symlink before touching the tree. A symlinked leaf OR
+# intermediate directory lets cp/mkdir write THROUGH it to files OUTSIDE the repo, invisible to git status.
+# C23-no-mounts bans in-vault symlinks entirely, so one repo-wide scan closes leaf, intermediate, and future variants. ---
+if [ "$is_birth" = 0 ]; then
+  syml="$(find "$target" -type l -not -path "$target/.git/*" 2>/dev/null | head -5)"
+  [ -n "$syml" ] && { printf 'FAIL[install]: target contains in-vault symlink(s) (contract C23-no-mounts) — resolve before install:\n%s\n' "$syml" >&2; exit 1; }
+fi
+
 # --- resolve substitution params: existing wiki reads target frontmatter; birth reads params-file / defaults ---
 llm="$target/LLM_WIKI.md"
 fmval() { sed -n "s/^$1:[[:space:]]*//p" "$2" 2>/dev/null | head -1 | sed -e 's/[[:space:]]*#.*$//' -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'\$/\1/" -e 's/[[:space:]]*$//'; }
-slug=""; role=""; ref_block="[]"; identity=""; fork_url=""; upstream_url=""; born_date="$(date +%F)"
+slug=""; role=""; frole=""; ref_block="[]"; identity=""; fork_url=""; upstream_url=""; born_date="$(date +%F)"
 if [ -f "$llm" ]; then
-  slug="$(fmval wiki-slug "$llm")"; role="$(fmval wiki-role "$llm")"
+  slug="$(fmval wiki-slug "$llm")"; role="$(fmval wiki-role "$llm")"; frole="$role"   # frole = the wiki's DECLARED role (params must not override it on an existing wiki)
   cd="$(fmval created "$llm")"; [ -n "$cd" ] && born_date="$cd"
   # fork/upstream provenance for the <SLUG>-GENESIS.md source page — resolved by the frontmatter slug, never basename
   src="$target/sources/git/${slug}-genesis/$(printf '%s' "$slug" | tr '[:lower:]' '[:upper:]')-GENESIS.md"
@@ -174,7 +182,11 @@ if [ -f "$llm" ]; then
   # overwrite on an existing wiki (F2, contract C9-schema-governed-exceptions) — NOT read back here; birth reads them from params.
 fi
 # birth defaults / params-file overrides (KEY=VALUE; *_FILE keys inject multi-line values). No `source` — parsed safely.
-# F7: *_FILE contents land in committed wiki content — refuse secret-looking or oversized files (secret-egress guard).
+# F7/R4: *_FILE and inline params land in committed wiki content — refuse files/values carrying COMMON secret
+# markers. This is a FLOOR (not a full secret scanner); for team/public the gitleaks pre-commit hook is the real
+# backstop, and role=private tolerates in-repo secrets by contract (C45-role-selects-lint-pack). One shared regex
+# for the file path (_sf_check) and the inline IDENTITY=/REFERENCE_WIKIS= guard, so both paths have equal coverage.
+SECRET_RE='BEGIN [A-Z0-9 ]*PRIVATE KEY|-----BEGIN|aws_secret_access_key|password[[:space:]]*[:=]|AKIA[0-9A-Z]{16}|ghp_[0-9A-Za-z]{20,}|gho_[0-9A-Za-z]{20,}|sk_live_[0-9A-Za-z]{16,}|sk-[0-9A-Za-z_-]{20,}|xox[baprs]-'
 _sf_check() {
   local f="$1" rp bn
   rp="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$f" 2>/dev/null || printf '%s' "$f")"   # R4: resolve symlinks so an innocent-named link → ~/.ssh/id_rsa is caught by its REAL basename
@@ -184,37 +196,41 @@ _sf_check() {
     .env|.env.*|*.pem|*.key|*.p12|*.pfx|*.crt|*.kdbx|id_rsa*|id_ed25519*|id_ecdsa*|*credential*|*secret*|*password*)
       echo "FAIL[install]: refusing to inject a secret-looking file into committed wiki content: $f (resolves to $rp)" >&2; return 1 ;;
   esac
-  [ "$(wc -c < "$rp" 2>/dev/null || echo 0)" -gt 65536 ] && { echo "FAIL[install]: params *_FILE too large (>64KB), refusing: $f" >&2; return 1; }
-  grep -qiE 'BEGIN [A-Z0-9 ]*PRIVATE KEY|-----BEGIN|aws_secret_access_key|password[[:space:]]*[:=]' "$rp" 2>/dev/null \
-    && { echo "FAIL[install]: params *_FILE contents carry a secret marker (private key / credential): $f" >&2; return 1; }
+  [ "$(wc -c < "$rp" 2>/dev/null || echo 0)" -ge 65536 ] && { echo "FAIL[install]: params *_FILE too large (>=64KiB), refusing: $f" >&2; return 1; }
+  grep -qiE "$SECRET_RE" "$rp" 2>/dev/null \
+    && { echo "FAIL[install]: params *_FILE contents carry a secret marker (private key / token / credential): $f" >&2; return 1; }
   return 0
 }
 if [ -n "$params_file" ] && [ -f "$params_file" ]; then
-  while IFS='=' read -r pk pv; do case "$pk" in
+  while IFS='=' read -r pk pv; do pk="${pk//[[:space:]]/}"; case "$pk" in   # P3: strip whitespace so ' ROLE'/'SLUG ' aren't silently dropped
     SLUG) slug="$pv";; ROLE) role="$pv";; FORK_REMOTE_URL) fork_url="$pv";; GENESIS_UPSTREAM_URL) upstream_url="$pv";;
     BORN_DATE) born_date="$pv";; REFERENCE_WIKIS) ref_block="$pv";; IDENTITY) identity="$pv";;
     IDENTITY_FILE) _sf_check "$pv" || exit 1; identity="$(< "$pv")";;
     REFERENCE_WIKIS_FILE) _sf_check "$pv" || exit 1; ref_block="$(< "$pv")";;
     ''|\#*) : ;; esac done < <(cat "$params_file"; echo)   # R6: trailing `echo` flushes a final line with no newline (POSIX read would drop it)
 fi
-[ -z "$slug" ] && slug="$(basename "$target")"
+# R3/P3 (C45-role-selects-lint-pack): on an EXISTING wiki, identity (slug + role) is READ, never invented.
+# A missing LLM_WIKI.md, a blank slug/role, or a params ROLE that DISAGREES with the declared wiki-role all
+# fail closed — a team/public wiki must never silently downgrade to the no-hook private branch. Birth supplies defaults.
+if [ "$is_birth" = 0 ]; then
+  [ -f "$llm" ] || { echo "FAIL[install]: existing wiki has no LLM_WIKI.md — cannot resolve identity/role; not a valid wiki state" >&2; exit 1; }
+  [ -n "$slug" ] || { echo "FAIL[install]: existing wiki has no readable wiki-slug — refusing rather than inventing one from the folder name" >&2; exit 1; }
+  [ -n "$role" ] || { echo "FAIL[install]: existing wiki has no readable wiki-role — refusing rather than defaulting to private (C45-role-selects-lint-pack)" >&2; exit 1; }
+  frole_n="$(printf '%s' "$frole" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+  rrole_n="$(printf '%s' "$role"  | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+  [ "$rrole_n" != "$frole_n" ] && { echo "FAIL[install]: params ROLE='$rrole_n' disagrees with the wiki's declared wiki-role='$frole_n' — role is read-only on an existing wiki (C45-role-selects-lint-pack); fix the params or the frontmatter" >&2; exit 1; }
+else
+  [ -z "$slug" ] && slug="$(basename "$target")"
+  [ -z "$role" ] && role="private"
+fi
 slug_upper="$(printf '%s' "$slug" | tr '[:lower:]' '[:upper:]')"
 role="$(printf '%s' "$role" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"   # F6: normalize so 'Public'/' team ' can't slip past the role→hook selector into the no-hook branch
 
-# R1 (C20-slug-identity / C22-realpath-coherence): slug==foldername enforced AFTER every override
-# (frontmatter, params-file SLUG, birth default) on EVERY path. realpath basename so a symlinked
-# access path permitted under C22-realpath-coherence still satisfies it; a params SLUG that disagrees with the folder is refused.
-base="$(basename "$(cd "$target" 2>/dev/null && pwd -P)")"
+# R1 (C20-slug-identity / C22-realpath-coherence): slug==foldername enforced AFTER every override. Use the
+# LOGICAL access basename (not realpath) so a C22-realpath-coherence same-named symlinked access path (repos_root/<slug> -> backing)
+# still satisfies it; a renamed folder (logical basename != slug) is refused.
+base="$(basename "$target")"
 [ "$slug" != "$base" ] && { echo "FAIL[install]: resolved slug '$slug' != folder name '$base' — slug==foldername is a hard invariant (contract C20-slug-identity / C22-realpath-coherence); a params-file SLUG or frontmatter that disagrees with the target folder is refused" >&2; exit 1; }
-
-# R3 (C45-role-selects-lint-pack): on an EXISTING wiki the role must be READ, never invented — a missing
-# LLM_WIKI.md or blank wiki-role fails closed (a team/public wiki must not silently downgrade to no-hook private).
-if [ "$is_birth" = 0 ]; then
-  [ -f "$llm" ] || { echo "FAIL[install]: existing wiki has no LLM_WIKI.md — cannot resolve identity/role; not a valid wiki state" >&2; exit 1; }
-  [ -n "$role" ] || { echo "FAIL[install]: existing wiki has no readable wiki-role — refusing rather than defaulting to private (C45-role-selects-lint-pack)" >&2; exit 1; }
-else
-  [ -z "$role" ] && role="private"
-fi
 
 [ -z "$identity" ] && identity="$slug — identity not yet authored at birth. Edit LLM_WIKI.md to describe this wiki's subject and boundary."
 [ -z "$upstream_url" ] && upstream_url="$(git -C "$genesis" remote get-url upstream 2>/dev/null || git -C "$genesis" remote get-url origin 2>/dev/null || echo '')"
@@ -222,8 +238,8 @@ fi
 # R4: content guard on the resolved identity / reference-wikis values — covers the inline IDENTITY=/REFERENCE_WIKIS=
 # forms that bypass _sf_check's file check, so a pasted private key / credential can't be rendered into committed content.
 for _v in "$identity" "$ref_block"; do
-  printf '%s' "$_v" | grep -qiE 'BEGIN [A-Z0-9 ]*PRIVATE KEY|-----BEGIN|aws_secret_access_key' \
-    && { echo "FAIL[install]: a substitution value carries a secret marker (private key / credential) — refusing to render it into committed content" >&2; exit 1; }
+  printf '%s' "$_v" | grep -qiE "$SECRET_RE" \
+    && { echo "FAIL[install]: a substitution value carries a secret marker (private key / token / credential) — refusing to render it into committed content" >&2; exit 1; }
 done
 
 # --- render into a 0700 tmp payload; renames + substitution before any diff ---
@@ -271,9 +287,7 @@ fork_src_rel="sources/git/${slug}-genesis/${slug_upper}-GENESIS.md"             
 added=(); changed=(); changed_root=()
 while IFS= read -r rel; do
   tpath="$target/$rel"
-  # R2 (contract C23-no-mounts): a symlink at a template-managed path would let cp write THROUGH it to a file
-  # OUTSIDE the repo, invisible to git status — refuse loudly (in-vault symlinks are banned anyway).
-  [ -L "$tpath" ] && { echo "FAIL[install]: target path is a symlink (contract C23-no-mounts bans in-vault symlinks): $rel — resolve it before install" >&2; exit 1; }
+  # (in-vault symlinks — leaf or intermediate — are already refused repo-wide by the C23-no-mounts pre-scan above)
   # Instance-owned pages excluded from overwrite on an EXISTING wiki (birth creates them once):
   # LLM_WIKI.md identity (F2/C9-schema-governed-exceptions) and the fork-source provenance page (R8/C4-fork-residence).
   if [ -e "$tpath" ] && { [ "$rel" = "LLM_WIKI.md" ] || [ "$rel" = "$fork_src_rel" ]; }; then continue; fi

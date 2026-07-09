@@ -296,6 +296,32 @@ printf '\n## Fork notes (instance-owned)\nlocal divergence documented here.\n' >
 git -C "$R8" commit -aqm "test: instance fork notes on the source page" >/dev/null 2>&1
 outR8="$(mdrun install "$R8")"; rcR8=$?
 grep -q "Fork notes" "$GS8" && ck f 0 "R8: fork-source page instance edits survive re-run" || ck f 1 "R8: fork-source page survives re-run" "instance prose clobbered"
+
+# R2b — a symlinked INTERMEDIATE directory is refused repo-wide; the outside file it points to is untouched
+R2B="$SB/acme-hotel2"; mdrun bootstrap "$R2B" "$P" >/dev/null 2>&1
+OUTD="$SB/outside-dir"; mkdir -p "$OUTD"; printf 'KEEP-EXTERNAL\n' > "$OUTD/SYNTHESIS.md"
+rm -rf "$R2B/synthesis"; ln -s "$OUTD" "$R2B/synthesis"
+git -C "$R2B" add -A >/dev/null 2>&1; git -C "$R2B" commit -qm "test: intermediate dir symlink out of the repo" >/dev/null 2>&1
+outR2B="$(mdrun install "$R2B")"; rcR2B=$?
+if [ "$rcR2B" -ne 0 ] && has "symlink" "$outR2B"; then ck f 0 "R2b: intermediate dir symlink refused (rc=$rcR2B)"; else ck f 1 "R2b: intermediate dir symlink refused" "rc=$rcR2B :: $(printf '%s' "$outR2B" | tail -2)"; fi
+grep -q KEEP-EXTERNAL "$OUTD/SYNTHESIS.md" && ck f 0 "R2b: file outside the repo NOT written through the dir symlink" || ck f 1 "R2b: outside file untouched" "external file overwritten through dir symlink"
+
+# role-override — a params ROLE that disagrees with the wiki's declared role is refused (no silent downgrade)
+RO="$SB/acme-india2"; mdrun bootstrap "$RO" "$P" >/dev/null 2>&1   # born private
+PRO="$SB/params-role"; printf 'ROLE=team\n' > "$PRO"
+outRO="$(mdrun install "$RO" "$PRO")"; rcRO=$?
+if [ "$rcRO" -ne 0 ] && has "role is read-only on an existing wiki" "$outRO"; then ck f 0 "role: disagreeing params ROLE refused (rc=$rcRO)"; else ck f 1 "role: disagreeing params ROLE refused" "rc=$rcRO :: $(printf '%s' "$outRO" | tail -2)"; fi
+
+# blank-slug — an existing wiki with a blank wiki-slug fails closed (never invented from basename)
+BS="$SB/acme-juliet"; mdrun bootstrap "$BS" "$P" >/dev/null 2>&1
+python3 - "$BS/LLM_WIKI.md" <<'PY'
+import re,sys
+p=sys.argv[1]; t=open(p).read()
+open(p,'w').write(re.sub(r'(?m)^wiki-slug:.*$','wiki-slug:',t))
+PY
+git -C "$BS" commit -aqm "test: blank wiki-slug on an existing wiki" >/dev/null 2>&1
+outBS="$(mdrun install "$BS")"; rcBS=$?
+if [ "$rcBS" -ne 0 ] && has "no readable wiki-slug" "$outBS"; then ck f 0 "slug: blank wiki-slug on existing wiki fails closed (rc=$rcBS)"; else ck f 1 "slug: blank wiki-slug fails closed" "rc=$rcBS :: $(printf '%s' "$outBS" | tail -2)"; fi
 echo
 
 # ============================ (g) clause-citation lint ============================
