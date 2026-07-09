@@ -1,7 +1,7 @@
 ---
 title: "{{WIKI_SLUG}} schema"
 # human-facing law generation (the load-skill identity line reads this);
-# the commit-precise pin lives in GENESIS.md — different facts, no duplication
+# the commit-precise genesis provenance lives in the birth commit message (contract C6) — different facts, no duplication
 contract-version: 1
 tags: [type/schema]
 created: {{YYYY-MM-DD}}
@@ -9,7 +9,7 @@ created: {{YYYY-MM-DD}}
 
 # SCHEMA — {{WIKI_SLUG}}
 
-Entry point for tools and agents. This wiki follows the genesis contract: the pin lives in `GENESIS.md` frontmatter; the law is materialized at `domains/contract/genesis-contract/contract-v1.md`.
+Entry point for tools and agents. This wiki follows the genesis contract: genesis provenance is the birth commit message (contract C6 `manifest`); the law is materialized at `domains/contract/genesis-contract/contract-v1.md`.
 
 ## Instance conventions
 
