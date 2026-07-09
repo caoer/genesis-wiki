@@ -149,10 +149,11 @@ genesis="$(git -C . rev-parse --show-toplevel)"           # cwd = the genesis cl
 seeds="$genesis/domains/contract/seeds"; contract="$genesis/domains/contract/genesis-contract"
 genesis_sha="$(git -C "$genesis" rev-parse HEAD)"
 
-# --- target guard: git-init only if empty/missing, else demand a clean tree ---
+# --- target guard: git-init only if empty/missing (birth), else demand a clean tree (existing) ---
 if [ ! -e "$target" ] || { [ -d "$target" ] && [ -z "$(ls -A "$target" 2>/dev/null)" ]; }; then
-  mkdir -p "$target"; [ -e "$target/.git" ] || git -C "$target" init -q
+  is_birth=1; mkdir -p "$target"; [ -e "$target/.git" ] || git -C "$target" init -q
 elif [ -e "$target/.git" ]; then
+  is_birth=0
   dirty="$(git -C "$target" status --porcelain 2>/dev/null)"
   [ -n "$dirty" ] && { printf 'FAIL[install]: target tree is DIRTY (commit/stash first; untracked counts):\n%s\n' "$dirty" >&2; exit 1; }
 else
@@ -166,11 +167,6 @@ slug=""; role=""; ref_block="[]"; identity=""; fork_url=""; upstream_url=""; bor
 if [ -f "$llm" ]; then
   slug="$(fmval wiki-slug "$llm")"; role="$(fmval wiki-role "$llm")"
   cd="$(fmval created "$llm")"; [ -n "$cd" ] && born_date="$cd"
-  # F1 (C20-slug-identity / C22-realpath-coherence): slug == folder name is a HARD invariant.
-  # Reading it two ways (frontmatter slug vs folder basename) is exactly the silent-clobber path —
-  # guard the ambiguity loudly rather than proceeding on divergent reads (silent chaos is the harm).
-  base="$(basename "$target")"
-  [ -n "$slug" ] && [ "$slug" != "$base" ] && { echo "FAIL[install]: wiki-slug '$slug' != folder name '$base' — slug==foldername is a hard invariant (contract C20-slug-identity / C22-realpath-coherence); rename the folder or fix wiki-slug, then re-run" >&2; exit 1; }
   # fork/upstream provenance for the <SLUG>-GENESIS.md source page — resolved by the frontmatter slug, never basename
   src="$target/sources/git/${slug}-genesis/$(printf '%s' "$slug" | tr '[:lower:]' '[:upper:]')-GENESIS.md"
   [ -f "$src" ] && { fork_url="$(fmval remote "$src")"; upstream_url="$(fmval upstream "$src")"; }
@@ -180,13 +176,17 @@ fi
 # birth defaults / params-file overrides (KEY=VALUE; *_FILE keys inject multi-line values). No `source` — parsed safely.
 # F7: *_FILE contents land in committed wiki content — refuse secret-looking or oversized files (secret-egress guard).
 _sf_check() {
-  local f="$1" bn; bn="$(basename "$f")"
-  [ -f "$f" ] || { echo "FAIL[install]: params *_FILE not found: $f" >&2; return 1; }
+  local f="$1" rp bn
+  rp="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$f" 2>/dev/null || printf '%s' "$f")"   # R4: resolve symlinks so an innocent-named link → ~/.ssh/id_rsa is caught by its REAL basename
+  [ -f "$rp" ] || { echo "FAIL[install]: params *_FILE not found: $f" >&2; return 1; }
+  bn="$(basename "$rp" | tr '[:upper:]' '[:lower:]')"                                                             # R4: case-insensitive
   case "$bn" in
-    .env|.env.*|*.pem|*.key|id_rsa*|id_ed25519*|*.p12|*.pfx|credentials|credentials.*|*secret*|*.crt)
-      echo "FAIL[install]: refusing to inject a secret-looking file into committed wiki content: $f" >&2; return 1 ;;
+    .env|.env.*|*.pem|*.key|*.p12|*.pfx|*.crt|*.kdbx|id_rsa*|id_ed25519*|id_ecdsa*|*credential*|*secret*|*password*)
+      echo "FAIL[install]: refusing to inject a secret-looking file into committed wiki content: $f (resolves to $rp)" >&2; return 1 ;;
   esac
-  [ "$(wc -c < "$f" 2>/dev/null || echo 0)" -gt 65536 ] && { echo "FAIL[install]: params *_FILE too large (>64KB), refusing: $f" >&2; return 1; }
+  [ "$(wc -c < "$rp" 2>/dev/null || echo 0)" -gt 65536 ] && { echo "FAIL[install]: params *_FILE too large (>64KB), refusing: $f" >&2; return 1; }
+  grep -qiE 'BEGIN [A-Z0-9 ]*PRIVATE KEY|-----BEGIN|aws_secret_access_key|password[[:space:]]*[:=]' "$rp" 2>/dev/null \
+    && { echo "FAIL[install]: params *_FILE contents carry a secret marker (private key / credential): $f" >&2; return 1; }
   return 0
 }
 if [ -n "$params_file" ] && [ -f "$params_file" ]; then
@@ -195,14 +195,36 @@ if [ -n "$params_file" ] && [ -f "$params_file" ]; then
     BORN_DATE) born_date="$pv";; REFERENCE_WIKIS) ref_block="$pv";; IDENTITY) identity="$pv";;
     IDENTITY_FILE) _sf_check "$pv" || exit 1; identity="$(< "$pv")";;
     REFERENCE_WIKIS_FILE) _sf_check "$pv" || exit 1; ref_block="$(< "$pv")";;
-    ''|\#*) : ;; esac done < "$params_file"
+    ''|\#*) : ;; esac done < <(cat "$params_file"; echo)   # R6: trailing `echo` flushes a final line with no newline (POSIX read would drop it)
 fi
 [ -z "$slug" ] && slug="$(basename "$target")"
 slug_upper="$(printf '%s' "$slug" | tr '[:lower:]' '[:upper:]')"
 role="$(printf '%s' "$role" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"   # F6: normalize so 'Public'/' team ' can't slip past the role→hook selector into the no-hook branch
-[ -z "$role" ] && role="private"
+
+# R1 (C20-slug-identity / C22-realpath-coherence): slug==foldername enforced AFTER every override
+# (frontmatter, params-file SLUG, birth default) on EVERY path. realpath basename so a symlinked
+# access path permitted under C22-realpath-coherence still satisfies it; a params SLUG that disagrees with the folder is refused.
+base="$(basename "$(cd "$target" 2>/dev/null && pwd -P)")"
+[ "$slug" != "$base" ] && { echo "FAIL[install]: resolved slug '$slug' != folder name '$base' — slug==foldername is a hard invariant (contract C20-slug-identity / C22-realpath-coherence); a params-file SLUG or frontmatter that disagrees with the target folder is refused" >&2; exit 1; }
+
+# R3 (C45-role-selects-lint-pack): on an EXISTING wiki the role must be READ, never invented — a missing
+# LLM_WIKI.md or blank wiki-role fails closed (a team/public wiki must not silently downgrade to no-hook private).
+if [ "$is_birth" = 0 ]; then
+  [ -f "$llm" ] || { echo "FAIL[install]: existing wiki has no LLM_WIKI.md — cannot resolve identity/role; not a valid wiki state" >&2; exit 1; }
+  [ -n "$role" ] || { echo "FAIL[install]: existing wiki has no readable wiki-role — refusing rather than defaulting to private (C45-role-selects-lint-pack)" >&2; exit 1; }
+else
+  [ -z "$role" ] && role="private"
+fi
+
 [ -z "$identity" ] && identity="$slug — identity not yet authored at birth. Edit LLM_WIKI.md to describe this wiki's subject and boundary."
 [ -z "$upstream_url" ] && upstream_url="$(git -C "$genesis" remote get-url upstream 2>/dev/null || git -C "$genesis" remote get-url origin 2>/dev/null || echo '')"
+
+# R4: content guard on the resolved identity / reference-wikis values — covers the inline IDENTITY=/REFERENCE_WIKIS=
+# forms that bypass _sf_check's file check, so a pasted private key / credential can't be rendered into committed content.
+for _v in "$identity" "$ref_block"; do
+  printf '%s' "$_v" | grep -qiE 'BEGIN [A-Z0-9 ]*PRIVATE KEY|-----BEGIN|aws_secret_access_key' \
+    && { echo "FAIL[install]: a substitution value carries a secret marker (private key / credential) — refusing to render it into committed content" >&2; exit 1; }
+done
 
 # --- render into a 0700 tmp payload; renames + substitution before any diff ---
 work="$(mktemp -d)"; chmod 700 "$work"; trap 'rm -rf "$work"' EXIT
@@ -245,16 +267,21 @@ residue="$(find "$payload" -type f \( -name '*.md' -o -name '*.yaml' -o -name '*
 
 # --- diff: classify every template path against the target (target-only files are instance content — never touched, never listed) ---
 ROOT_CLASS=" SCHEMA.md CLAUDE.md meridian.yaml .gitignore .gitleaks.toml lefthook.yml "   # LLM_WIKI.md is NOT here — excluded from overwrite (F2/C9-schema-governed-exceptions), handled below
+fork_src_rel="sources/git/${slug}-genesis/${slug_upper}-GENESIS.md"                        # R8: instance-authored fork provenance page — excluded like LLM_WIKI.md
 added=(); changed=(); changed_root=()
 while IFS= read -r rel; do
   tpath="$target/$rel"
-  # F2 (contract C9-schema-governed-exceptions): LLM_WIKI.md is instance-owned identity — on an EXISTING wiki it is never
-  # re-rendered or overwritten (birth creates it once; a re-install leaves it entirely alone).
-  if [ "$rel" = "LLM_WIKI.md" ] && [ -e "$tpath" ]; then continue; fi
+  # R2 (contract C23-no-mounts): a symlink at a template-managed path would let cp write THROUGH it to a file
+  # OUTSIDE the repo, invisible to git status — refuse loudly (in-vault symlinks are banned anyway).
+  [ -L "$tpath" ] && { echo "FAIL[install]: target path is a symlink (contract C23-no-mounts bans in-vault symlinks): $rel — resolve it before install" >&2; exit 1; }
+  # Instance-owned pages excluded from overwrite on an EXISTING wiki (birth creates them once):
+  # LLM_WIKI.md identity (F2/C9-schema-governed-exceptions) and the fork-source provenance page (R8/C4-fork-residence).
+  if [ -e "$tpath" ] && { [ "$rel" = "LLM_WIKI.md" ] || [ "$rel" = "$fork_src_rel" ]; }; then continue; fi
   if [ ! -e "$tpath" ]; then added+=("$rel")
   elif cmp -s "$payload/$rel" "$tpath"; then :                                            # identical — no diff
-  elif printf '%s' "$ROOT_CLASS" | grep -q " $rel "; then changed_root+=("$rel")
-  else changed+=("$rel"); fi
+  else
+    case " $ROOT_CLASS " in *" $rel "*) changed_root+=("$rel") ;; *) changed+=("$rel") ;; esac  # literal match — dots in .gitignore/.gitleaks.toml are not regex wildcards
+  fi
 done < <(cd "$payload" && find . -type f | sed 's|^\./||' | sort)
 
 # --- print the grouped diff summary ---
@@ -283,19 +310,25 @@ def parse(path):
 a, abody = parse(sys.argv[1])                                                     # target (installed now)
 b, bbody = parse(sys.argv[2])                                                     # template (what an accept would write)
 # symmetric: changed / removed-by-accept / added-by-accept — never an empty delta that hides a destructive accept
+printed = False
 for k in a:
-    if k not in b: print(f"field: {k}: {a[k]} → (removed by accept)")
-    elif a[k] != b[k]: print(f"field: {k}: {a[k]} → {b[k]}")
+    if k not in b: print(f"field: {k}: {a[k]} → (removed by accept)"); printed = True
+    elif a[k] != b[k]: print(f"field: {k}: {a[k]} → {b[k]}"); printed = True
 for k in b:
-    if k not in a: print(f"field: (absent) → {k}: {b[k]} (added by accept)")
-if abody != bbody: print("body: differs — review the full file, not just the fields above")
+    if k not in a: print(f"field: (absent) → {k}: {b[k]} (added by accept)"); printed = True
+if abody != bbody: print("body: differs — review the full file, not just the fields above"); printed = True
+if not printed: print("differs in whitespace/comments only — review the raw file (a byte difference was detected)")
 PY
   case "$accept_root" in *" $r "*) : ;; *) echo "      accept: re-run with accept-root arg containing \"$r\"" ;; esac
 done
 echo
 
+# R5/F6 fail-closed BEFORE writing anything: a team/public target with no lefthook aborts with a CLEAN tree
+# (the hook install below would otherwise run after the copy, wedging a half-born tree on a fresh machine).
+case "$role" in team|public) command -v lefthook >/dev/null 2>&1 || { echo "FAIL[install]: role=$role requires the secrets-scan hook but lefthook is absent — install lefthook then re-run (nothing written yet)" >&2; exit 1; } ;; esac
+
 # --- copy: apply ADDED + CHANGED(non-root) + accepted CHANGED-ROOT; hold back refused root ---
-apply() { mkdir -p "$target/$(dirname "$1")"; cp "$payload/$1" "$target/$1"; }
+apply() { mkdir -p "$target/$(dirname "$1")"; rm -f "$target/$1"; cp "$payload/$1" "$target/$1"; }   # R2: rm -f replaces a stale symlink with a real file instead of writing through it
 for r in "${added[@]}"   "${changed[@]}"; do apply "$r"; done
 held=0
 for r in "${changed_root[@]}"; do

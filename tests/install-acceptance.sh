@@ -245,6 +245,57 @@ IDENTITY_FILE=$SECF
 EOF
 outF7="$(mdrun bootstrap "$F7" "$PF7")"; rcF7=$?
 if [ "$rcF7" -ne 0 ] && has "secret-looking file" "$outF7"; then ck f 0 "F7: secret-looking IDENTITY_FILE refused (rc=$rcF7)"; else ck f 1 "F7: secret-looking IDENTITY_FILE refused" "rc=$rcF7 :: $(printf '%s' "$outF7" | tail -2)"; fi
+
+# R1 — a params-file SLUG that disagrees with the folder is refused (guard re-asserted AFTER the override)
+R1="$SB/acme-victor"; mdrun bootstrap "$R1" "$P" >/dev/null 2>&1
+PR1="$SB/params-slug"; printf 'SLUG=evil\n' > "$PR1"
+outR1="$(mdrun install "$R1" "$PR1")"; rcR1=$?
+if [ "$rcR1" -ne 0 ] && has "!= folder name" "$outR1"; then ck f 0 "R1: params-file SLUG override refused (rc=$rcR1)"; else ck f 1 "R1: params-file SLUG override refused" "rc=$rcR1 :: $(printf '%s' "$outR1" | tail -2)"; fi
+
+# R2 — a symlinked template-managed path is refused; the file it points to OUTSIDE the repo is untouched
+R2="$SB/acme-whiskey"; mdrun bootstrap "$R2" "$P" >/dev/null 2>&1
+OUTSIDE="$SB/outside-victim.txt"; printf 'EXTERNAL-KEEP\n' > "$OUTSIDE"
+rm -f "$R2/health/HEALTH.md"; ln -s "$OUTSIDE" "$R2/health/HEALTH.md"
+git -C "$R2" add -A >/dev/null 2>&1; git -C "$R2" commit -qm "test: symlink a managed file out of the repo" >/dev/null 2>&1
+outR2="$(mdrun install "$R2")"; rcR2=$?
+if [ "$rcR2" -ne 0 ] && has "symlink" "$outR2"; then ck f 0 "R2: symlinked target path refused (rc=$rcR2)"; else ck f 1 "R2: symlinked target path refused" "rc=$rcR2 :: $(printf '%s' "$outR2" | tail -2)"; fi
+grep -q EXTERNAL-KEEP "$OUTSIDE" && ck f 0 "R2: file outside the repo NOT clobbered through the symlink" || ck f 1 "R2: outside file not clobbered" "external file overwritten"
+
+# R3 — an existing wiki with a blank/unreadable wiki-role fails closed (never silently downgrades to private)
+R3="$SB/acme-xray"; mdrun bootstrap "$R3" "$P" >/dev/null 2>&1
+python3 - "$R3/LLM_WIKI.md" <<'PY'
+import re,sys
+p=sys.argv[1]; t=open(p).read()
+open(p,'w').write(re.sub(r'(?m)^wiki-role:.*$','wiki-role:',t))
+PY
+git -C "$R3" commit -aqm "test: blank wiki-role on an existing wiki" >/dev/null 2>&1
+outR3="$(mdrun install "$R3")"; rcR3=$?
+if [ "$rcR3" -ne 0 ] && has "no readable wiki-role" "$outR3"; then ck f 0 "R3: blank role on existing wiki fails closed (rc=$rcR3)"; else ck f 1 "R3: blank role fails closed" "rc=$rcR3 :: $(printf '%s' "$outR3" | tail -2)"; fi
+
+# R6 — a params-file whose final line has no trailing newline still honors that last KEY=VALUE
+R6="$SB/acme-yankee"; PR6="$SB/params-nonl"
+printf 'ROLE=private\nBORN_DATE=%s\nFORK_REMOTE_URL=git@github.com:acme/acme-yankee.git' "$BORN" > "$PR6"   # deliberately NO trailing newline
+mdrun bootstrap "$R6" "$PR6" >/dev/null 2>&1
+grep -rq 'acme-yankee.git' "$R6" 2>/dev/null && ck f 0 "R6: params last line (no trailing newline) honored" || ck f 1 "R6: params last line honored" "final KEY=VALUE silently dropped"
+
+# R7 — a whitespace-only root divergence still prints a non-empty delta (C7 invariant)
+R7="$SB/acme-zulu"; mdrun bootstrap "$R7" "$P" >/dev/null 2>&1
+python3 - "$R7/SCHEMA.md" <<'PY'
+import sys
+p=sys.argv[1]; t=open(p).read()
+open(p,'w').write(t.replace('contract-version: 1','contract-version: 1   ',1))   # trailing whitespace only
+PY
+git -C "$R7" commit -aqm "test: whitespace-only frontmatter divergence" >/dev/null 2>&1
+outR7="$(mdrun install "$R7")"; rcR7=$?
+if has "! SCHEMA.md" "$outR7" && has "whitespace/comments only" "$outR7"; then ck f 0 "R7: whitespace-only root divergence → non-empty delta"; else ck f 1 "R7: whitespace-only delta" "$(printf '%s' "$outR7" | grep -A2 'SCHEMA.md' | head -3)"; fi
+
+# R8 — instance edits to the fork-source provenance page survive a re-run (excluded from overwrite like LLM_WIKI.md)
+R8="$SB/acme-golf2"; mdrun bootstrap "$R8" "$P" >/dev/null 2>&1
+GS8="$R8/sources/git/acme-golf2-genesis/ACME-GOLF2-GENESIS.md"
+printf '\n## Fork notes (instance-owned)\nlocal divergence documented here.\n' >> "$GS8"
+git -C "$R8" commit -aqm "test: instance fork notes on the source page" >/dev/null 2>&1
+outR8="$(mdrun install "$R8")"; rcR8=$?
+grep -q "Fork notes" "$GS8" && ck f 0 "R8: fork-source page instance edits survive re-run" || ck f 1 "R8: fork-source page survives re-run" "instance prose clobbered"
 echo
 
 # ============================ (g) clause-citation lint ============================
