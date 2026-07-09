@@ -20,8 +20,8 @@ trimmed to floor FIRST, then declared honestly (a budget that lies is worse than
 law as the pins).
 
 Rationale (maintainer surface — never rendered): this block is contract-static and
-genesis-owned. It materializes into every child hash-gated (C6/C7); genesis updates it via
-ordinary amendment; children ingest (C15) and NEVER restate it — a child SCHEMA.md carries no
+genesis-owned. It materializes into every child via the adjudicated install diff (C7); genesis
+updates it via ordinary amendment; children take it on an install re-run (C50) and NEVER restate it — a child SCHEMA.md carries no
 architecture/directory section at all (C38 point-or-own applied to injected surfaces; the
 duplicate has no home to come back to). Version mechanics never appear here — they belong to
 the handshake block (S4). Clause refs are number+slug pointers (C39), not restatements.
