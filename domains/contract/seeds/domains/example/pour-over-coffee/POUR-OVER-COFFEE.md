@@ -8,7 +8,7 @@ created: {{YYYY-MM-DD}}
 
 An example's job is to TEACH. What this page demonstrates:
 
-- **The index carries a `description:`** — the computed catalog reads it (contract C27 `prescription-authored`); write it for a stranger deciding whether to open this domain.
+- **The index carries a `description:`** — the computed catalog reads it (contract `C27-prescription-authored`); write it for a stranger deciding whether to open this domain.
 - **Clusters are pure containers, one grouping level**: `domains/example/pour-over-coffee/` — `example` is the cluster, this dir is the domain.
 - **The index links its leaves and never enumerates live state** (no counts, no listings — computed views do that).
 

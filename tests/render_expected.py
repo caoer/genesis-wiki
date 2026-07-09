@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Independent render oracle for the acceptance harness (assertion a — byte-identity).
 
-Re-implements the C50 render (seeds/* minus README -> root; genesis-contract/* mirrored;
+Re-implements the C50-minimal-install render (seeds/* minus README -> root; genesis-contract/* mirrored;
 {{WIKI_SLUG}} file/dir renames; token substitution with the example-domain YYYY-MM-DD
 skip) from scratch, so a `diff -r` against a `^bootstrap`ed tree proves the born wiki is
 byte-identical to the rendered template. Deliberately does NOT call INSTALL.md — it is the

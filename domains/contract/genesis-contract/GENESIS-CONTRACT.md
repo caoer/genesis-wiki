@@ -6,9 +6,9 @@ created: 2026-07-08
 
 # genesis-contract
 
-The contract domain (C40 `contract-domain-home`). Pages here are the source children materialize from.
+The contract domain (`C40-contract-domain-home`). Pages here are the source children materialize from.
 
 | page | is |
 |---|---|
-| [[contract-v1]] | the ratified law — 50 numbered, slugged clauses, 5 retired to stubs (C39 `clause-citation`) |
+| [[contract-v1]] | the ratified law — 50 numbered, slugged clauses, 5 retired to stubs (`C39-clause-citation`) |
 | [[architecture-block]] | literate source of the genesis-owned architecture block (budget 320, render-once) |

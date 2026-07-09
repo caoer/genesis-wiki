@@ -23,7 +23,7 @@ inspects a target read-only — all as `md run` tasks, no compiled code.
 
 - **Payload = two trees.** `domains/contract/seeds/*` (minus its own `README.md`)
   → the target **root**; `domains/contract/genesis-contract/*` → the target at
-  `domains/contract/genesis-contract/*` **mirrored 1:1** (contract C49
+  `domains/contract/genesis-contract/*` **mirrored 1:1** (contract C49-upstream-layout
   `upstream-layout`). This page and the genesis-clone's own operational files
   are never copied.
 - **cwd is the genesis clone, never the target.** Every `git` invocation is
@@ -166,16 +166,16 @@ slug=""; role=""; ref_block="[]"; identity=""; fork_url=""; upstream_url=""; bor
 if [ -f "$llm" ]; then
   slug="$(fmval wiki-slug "$llm")"; role="$(fmval wiki-role "$llm")"
   cd="$(fmval created "$llm")"; [ -n "$cd" ] && born_date="$cd"
-  # F1 (C20 slug-identity / C22 realpath-coherence): slug == folder name is a HARD invariant.
+  # F1 (C20-slug-identity / C22-realpath-coherence): slug == folder name is a HARD invariant.
   # Reading it two ways (frontmatter slug vs folder basename) is exactly the silent-clobber path —
   # guard the ambiguity loudly rather than proceeding on divergent reads (silent chaos is the harm).
   base="$(basename "$target")"
-  [ -n "$slug" ] && [ "$slug" != "$base" ] && { echo "FAIL[install]: wiki-slug '$slug' != folder name '$base' — slug==foldername is a hard invariant (contract C20 slug-identity / C22 realpath-coherence); rename the folder or fix wiki-slug, then re-run" >&2; exit 1; }
+  [ -n "$slug" ] && [ "$slug" != "$base" ] && { echo "FAIL[install]: wiki-slug '$slug' != folder name '$base' — slug==foldername is a hard invariant (contract C20-slug-identity / C22-realpath-coherence); rename the folder or fix wiki-slug, then re-run" >&2; exit 1; }
   # fork/upstream provenance for the <SLUG>-GENESIS.md source page — resolved by the frontmatter slug, never basename
   src="$target/sources/git/${slug}-genesis/$(printf '%s' "$slug" | tr '[:lower:]' '[:upper:]')-GENESIS.md"
   [ -f "$src" ] && { fork_url="$(fmval remote "$src")"; upstream_url="$(fmval upstream "$src")"; }
   # identity + reference-wikis are instance-owned and live only in LLM_WIKI.md, which is excluded from
-  # overwrite on an existing wiki (F2, contract C9) — NOT read back here; birth reads them from params.
+  # overwrite on an existing wiki (F2, contract C9-schema-governed-exceptions) — NOT read back here; birth reads them from params.
 fi
 # birth defaults / params-file overrides (KEY=VALUE; *_FILE keys inject multi-line values). No `source` — parsed safely.
 # F7: *_FILE contents land in committed wiki content — refuse secret-looking or oversized files (secret-egress guard).
@@ -244,11 +244,11 @@ residue="$(find "$payload" -type f \( -name '*.md' -o -name '*.yaml' -o -name '*
 [ -n "$residue" ] && { printf 'FAIL[install]: unresolved {{token}} residue after render (aborting before copy):\n%s\n' "$residue" >&2; exit 1; }
 
 # --- diff: classify every template path against the target (target-only files are instance content — never touched, never listed) ---
-ROOT_CLASS=" SCHEMA.md CLAUDE.md meridian.yaml .gitignore .gitleaks.toml lefthook.yml "   # LLM_WIKI.md is NOT here — excluded from overwrite (F2/C9), handled below
+ROOT_CLASS=" SCHEMA.md CLAUDE.md meridian.yaml .gitignore .gitleaks.toml lefthook.yml "   # LLM_WIKI.md is NOT here — excluded from overwrite (F2/C9-schema-governed-exceptions), handled below
 added=(); changed=(); changed_root=()
 while IFS= read -r rel; do
   tpath="$target/$rel"
-  # F2 (contract C9): LLM_WIKI.md is instance-owned identity — on an EXISTING wiki it is never
+  # F2 (contract C9-schema-governed-exceptions): LLM_WIKI.md is instance-owned identity — on an EXISTING wiki it is never
   # re-rendered or overwritten (birth creates it once; a re-install leaves it entirely alone).
   if [ "$rel" = "LLM_WIKI.md" ] && [ -e "$tpath" ]; then continue; fi
   if [ ! -e "$tpath" ]; then added+=("$rel")
@@ -303,25 +303,25 @@ for r in "${changed_root[@]}"; do
 done
 [ "$held" -gt 0 ] && echo "root-refused: $held diverged-root file(s) held back — accept each explicitly, then re-run"
 
-# --- hooks: role-selected (C45 role-selects-lint-pack). team/public get the secrets-scan pre-commit; private gets none. lefthook.yml is role-owned, never clobbered ---
+# --- hooks: role-selected (C45-role-selects-lint-pack). team/public get the secrets-scan pre-commit; private gets none. lefthook.yml is role-owned, never clobbered ---
 case "$role" in
   team|public)
     if [ ! -f "$target/lefthook.yml" ]; then
       printf '%s\n' \
-        '# Git hooks — genesis-managed secrets-scan (team/public pack, contract C45 role-selects-lint-pack).' \
+        '# Git hooks — genesis-managed secrets-scan (team/public pack, contract C45-role-selects-lint-pack).' \
         'output:' '  - failure' 'pre-commit:' '  jobs:' '    - name: secrets-scan' \
         '      run: gitleaks git --staged --pre-commit --no-banner --redact' > "$target/lefthook.yml"
     fi
-    # F6 fail-closed: team/public must NEVER reach a commit-able state without the secrets-scan hook (C45 no-unhooked-window)
+    # F6 fail-closed: team/public must NEVER reach a commit-able state without the secrets-scan hook (C45-role-selects-lint-pack no-unhooked-window)
     if command -v lefthook >/dev/null 2>&1; then
       ( cd "$target" && lefthook install --force >/dev/null 2>&1 ) \
         && echo "hooks: lefthook secrets-scan active ($role)" \
-        || { echo "FAIL[install]: lefthook install failed for role=$role — team/public must not have an unhooked window (C45); fix lefthook then re-run" >&2; exit 1; }
+        || { echo "FAIL[install]: lefthook install failed for role=$role — team/public must not have an unhooked window (C45-role-selects-lint-pack); fix lefthook then re-run" >&2; exit 1; }
     else
-      echo "FAIL[install]: lefthook binary absent but role=$role requires the secrets-scan hook (C45 no-unhooked-window) — install lefthook then re-run" >&2; exit 1
+      echo "FAIL[install]: lefthook binary absent but role=$role requires the secrets-scan hook (C45-role-selects-lint-pack no-unhooked-window) — install lefthook then re-run" >&2; exit 1
     fi ;;
-  private) echo "hooks: role=private — no hooks (C45 role-selects-lint-pack: private keeps secrets in-repo, no scan)" ;;
-  *) echo "FAIL[install]: unknown role '$role' — must be private|team|public (C45 role-selects-lint-pack); refusing rather than silently skipping the hook" >&2; exit 1 ;;
+  private) echo "hooks: role=private — no hooks (C45-role-selects-lint-pack: private keeps secrets in-repo, no scan)" ;;
+  *) echo "FAIL[install]: unknown role '$role' — must be private|team|public (C45-role-selects-lint-pack); refusing rather than silently skipping the hook" >&2; exit 1 ;;
 esac
 
 # --- end-state ---

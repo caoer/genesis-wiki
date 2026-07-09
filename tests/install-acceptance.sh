@@ -2,7 +2,7 @@
 # tests/install-acceptance.sh — acceptance harness for INSTALL.md (minimal-model, contract v1.1).
 #
 # Genesis-OPERATIONAL, re-runnable, lives at the genesis root under tests/ — like INSTALL.md
-# and seeds/README (C49), it is NEVER shipped to children: `^install` copies only
+# and seeds/README (C49-upstream-layout), it is NEVER shipped to children: `^install` copies only
 # `domains/contract/seeds/*` (minus README) + `domains/contract/genesis-contract/*`, so a
 # root-level tests/ dir is auto-excluded. Assertion (a) re-confirms this on a born wiki.
 #
@@ -31,7 +31,7 @@ KEEP="${1:-}"
 cleanup(){ [ "$KEEP" = "--keep" ] || rm -rf "$SB"; }
 trap cleanup EXIT
 
-declare -A ST; for L in a b c d e f; do ST[$L]=pass; done
+declare -A ST; for L in a b c d e f g; do ST[$L]=pass; done
 
 has(){ case "$2" in *"$1"*) return 0;; *) return 1;; esac; }          # has <needle> <haystack>
 ck(){ # ck <letter> <ok:0|1> <desc> [detail]
@@ -60,7 +60,7 @@ mdcheck(){ # mdcheck <target> [wikipath] — ^check with the one declared env va
 }
 
 # shared birth params. NO SLUG token: the engine derives slug = basename(target), honoring the
-# slug=foldername invariant (C20 slug-identity / C22 realpath-coherence) — so every fixture dir is
+# slug=foldername invariant (C20-slug-identity / C22-realpath-coherence) — so every fixture dir is
 # named as its own valid slug. Single-line identity + [] reference-wikis keep the re-run idempotent
 # (the engine re-reads these from LLM_WIKI.md via head -1 / single-line awk).
 ROLE=private; BORN=2026-07-09; REF='[]'
@@ -94,8 +94,8 @@ expect a "prints birth-provenance line (prose, names genesis sha)" "BOOTSTRAP: b
 nA="$(git -C "$A" rev-list --count HEAD 2>/dev/null || echo -1)"
 [ "$nA" = "1" ] && ck a 0 "exactly one birth commit" || ck a 1 "exactly one birth commit" "rev-list count=$nA"
 subjA="$(git -C "$A" log -1 --format=%s 2>/dev/null)"
-[ "$subjA" = "birth: $slugA from genesis@$HEAD" ] && ck a 0 "birth commit subject is the C6 prose" \
-  || ck a 1 "birth commit subject is the C6 prose" "got: [$subjA]"
+[ "$subjA" = "birth: $slugA from genesis@$HEAD" ] && ck a 0 "birth commit subject is the C6-manifest prose" \
+  || ck a 1 "birth commit subject is the C6-manifest prose" "got: [$subjA]"
 bodyA="$(git -C "$A" log -1 --format=%B 2>/dev/null)"
 refute a "no Genesis-Wiki-Pin trailer on the birth commit" "Genesis-Wiki-Pin" "$bodyA"
 
@@ -106,16 +106,16 @@ resA="$(find "$A" -type f \( -name '*.md' -o -name '*.yaml' -o -name '*.yml' -o 
   || ck a 1 "zero non-teaching {{ residue" "$(printf '%s' "$resA" | head -4)"
 
 # seeds/README deliberate-absence set + genesis-operational exclusions (confirms harness is unshipped)
-absent  a "$A/sessions"                   "no sessions/ (C44 companion)"
-absent  a "$A/foreign"                    "no foreign/ (C23 reserved)"
-absent  a "$A/lefthook.yml"               "no lefthook.yml (role=private, C45)"
+absent  a "$A/sessions"                   "no sessions/ (C44-claimed-trio companion)"
+absent  a "$A/foreign"                    "no foreign/ (C23-no-mounts reserved)"
+absent  a "$A/lefthook.yml"               "no lefthook.yml (role=private, C45-role-selects-lint-pack)"
 absent  a "$A/health/rules"               "no health/rules/ (materializes from genesis, not seeds)"
-absent  a "$A/INSTALL.md"                 "INSTALL.md not shipped to child (C49)"
+absent  a "$A/INSTALL.md"                 "INSTALL.md not shipped to child (C49-upstream-layout)"
 absent  a "$A/README.md"                  "seeds/README not shipped (it documents seeds)"
 absent  a "$A/tests"                      "tests/ (this harness) not shipped to child"
 present a "$A/domains/example"            "teaching example domain present at birth"
 present a "$A/LLM_WIKI.md"                "LLM_WIKI.md present (identity)"
-present a "$A/domains/contract/genesis-contract/contract-v1.md" "contract mirrored 1:1 (C49)"
+present a "$A/domains/contract/genesis-contract/contract-v1.md" "contract mirrored 1:1 (C49-upstream-layout)"
 
 # byte-identity: independent render (NOT the engine) -> diff -r
 EXP="$SB/expected"
@@ -247,10 +247,17 @@ outF7="$(mdrun bootstrap "$F7" "$PF7")"; rcF7=$?
 if [ "$rcF7" -ne 0 ] && has "secret-looking file" "$outF7"; then ck f 0 "F7: secret-looking IDENTITY_FILE refused (rc=$rcF7)"; else ck f 1 "F7: secret-looking IDENTITY_FILE refused" "rc=$rcF7 :: $(printf '%s' "$outF7" | tail -2)"; fi
 echo
 
+# ============================ (g) clause-citation lint ============================
+echo "${BLD}(g) clause-citation lint (contract C39-clause-citation)${RST}"
+glint="$(python3 "$TESTS/lint_clause_cites.py" "$GENESIS" 2>&1)"; grc=$?
+printf '%s\n' "$glint"
+[ "$grc" -eq 0 ] && ST[g]=pass || ST[g]=fail
+echo
+
 # ============================ summary ============================
 echo "${BLD}=== GATE SUMMARY  (INSTALL.md @ genesis ${HEAD:0:12}) ===${RST}"
 red=0
-for L in a b c d e f; do
+for L in a b c d e f g; do
   if [ "${ST[$L]}" = pass ]; then printf '  %s%s: pass%s\n' "$GRN" "$L" "$RST"
   else printf '  %s%s: FAIL%s\n' "$RED" "$L" "$RST"; red=1; fi
 done

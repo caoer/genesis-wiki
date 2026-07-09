@@ -1,7 +1,7 @@
 ---
 wiki-slug: "{{WIKI_SLUG}}"
-wiki-role: "{{ROLE}}"        # private | team | public — selects this wiki's lint pack (contract C45 `role-selects-lint-pack`)
-reference-wikis: {{REFERENCE_WIKIS_BLOCK}}   # ordered {slug, git, role} entries; [] = standalone is valid (contract C21 `reference-block`)
+wiki-role: "{{ROLE}}"        # private | team | public — selects this wiki's lint pack (contract `C45-role-selects-lint-pack`)
+reference-wikis: {{REFERENCE_WIKIS_BLOCK}}   # ordered {slug, git, role} entries; [] = standalone is valid (contract `C21-reference-block`)
 tags: [type/wiki-identity]
 created: {{YYYY-MM-DD}}
 md-load-skill: "[[LLM_WIKI#^load-skill]]"
