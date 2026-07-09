@@ -8,13 +8,13 @@ upstream: "{{GENESIS_UPSTREAM_URL}}"
 upstream-branch: main
 why-here: "This wiki's own fork of genesis — the operative law (contract C4 `fork-residence`); every llm-wiki child registers its fork as a git source."
 delta: "None at birth — fork == upstream merge-base; law changes land here first (contract C11 `fork-first-amendment`)."
-map: "[[GENESIS]] (pin), [[contract-v1]] (materialized law), [[architecture-block]]"
+map: "[[contract-v1]] (materialized law), [[architecture-block]]"
 captures: "domains/contract/genesis-contract/* materialized at birth; seeds tree consumed at birth."
-description: "Genesis fork — operative law source. No commit:/branch: fields by design — the pin is GENESIS.md's fact (contract C4, C38 `point-or-own`)."
+description: "Genesis fork — operative law source. No commit:/branch: fields by design — genesis provenance is the birth commit message (contract C6, C38 `point-or-own`)."
 tags: [type/repo]
 created: {{YYYY-MM-DD}}
 ---
 
 # {{WIKI_SLUG}}-genesis
 
-The child's own fork of the genesis upstream. Checkout: `repos_root/{{WIKI_SLUG}}-genesis`. Absorbs upstream via ordinary `git merge` (contract C3 `two-repo-rule`); the wiki ingests only file deltas between two fork commits (contract C15 `two-hop-upgrade`).
+The child's own fork of the genesis upstream. Checkout: `repos_root/{{WIKI_SLUG}}-genesis`. Absorbs upstream via ordinary `git merge` (contract C3 `two-repo-rule`); the wiki takes updates as adjudicated install re-runs — rendered files only, never git history (contract C50 `minimal-install`).
