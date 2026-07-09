@@ -48,7 +48,7 @@ Flow: `inbox → sources → domains → synthesis → effects`.
 | `effects/` | pin-verified page per artifact (C37 effect-pin-lifecycle) | effect lifecycle |
 | `decisions/` | decision queue (C34 decision-queue-lapse) | file, never delete |
 | `bases/` | computed views (C27 prescription-authored) | yes; contract rows hash-gated |
-| `logs/` | operational records (C17 compat-window) | append only |
+| `logs/` | operational records | append only |
 | `templates/` | page templates | yes |
 | `foreign/` | stays empty (C23 no-mounts); cross-wiki `wiki://` (C24) | never |
 | sessions | **not in wiki** — `<slug>-sessions` companion (C44, C48) | session tools |
