@@ -31,7 +31,7 @@ KEEP="${1:-}"
 cleanup(){ [ "$KEEP" = "--keep" ] || rm -rf "$SB"; }
 trap cleanup EXIT
 
-declare -A ST; for L in a b c d e; do ST[$L]=pass; done
+declare -A ST; for L in a b c d e f; do ST[$L]=pass; done
 
 has(){ case "$2" in *"$1"*) return 0;; *) return 1;; esac; }          # has <needle> <haystack>
 ck(){ # ck <letter> <ok:0|1> <desc> [detail]
@@ -197,10 +197,60 @@ printf '%s\n' "$elint"
 [ "$erc" -eq 0 ] && ST[e]=pass || ST[e]=fail
 echo
 
+# ============================ (f) design-fix regressions (F1 slug-guard / F2 LLM_WIKI exclude / F5 symmetric delta) ============================
+echo "${BLD}(f) design-fix regressions${RST}"
+
+# F1 — slug != folder name must FAIL loud (born wiki whose dir was renamed but keeps its wiki-slug)
+F1="$SB/acme-foxtrot"; mdrun bootstrap "$F1" "$P" >/dev/null 2>&1
+mv "$F1" "$SB/renamed-foxtrot"
+outF1="$(mdrun install "$SB/renamed-foxtrot")"; rcF1=$?
+if [ "$rcF1" -ne 0 ] && has "!= folder name" "$outF1"; then ck f 0 "F1: slug != foldername refused loud (rc=$rcF1)"; else ck f 1 "F1: slug != foldername refused" "rc=$rcF1 :: $(printf '%s' "$outF1" | tail -2)"; fi
+
+# F2 — multi-line identity: written whole at birth; LLM_WIKI.md excluded from overwrite; re-run stays in-sync, identity intact
+F2="$SB/acme-golf"; PF2="$SB/params-ml"; IDF="$SB/identity-ml"
+printf 'First paragraph of the identity.\n\nSecond paragraph a single-line read would silently drop.\n' > "$IDF"
+cat > "$PF2" <<EOF
+ROLE=private
+BORN_DATE=$BORN
+REFERENCE_WIKIS=$REF
+IDENTITY_FILE=$IDF
+FORK_REMOTE_URL=$FORKURL
+GENESIS_UPSTREAM_URL=$UPURL
+EOF
+mdrun bootstrap "$F2" "$PF2" >/dev/null 2>&1
+grep -q "Second paragraph" "$F2/LLM_WIKI.md" && ck f 0 "F2: multi-line identity written whole at birth" || ck f 1 "F2: multi-line identity written whole at birth" "second paragraph missing from LLM_WIKI.md"
+outF2="$(mdrun install "$F2")"; rcF2=$?
+expect f "F2: re-run in-sync (LLM_WIKI.md not a spurious CHANGED-ROOT)" "CONVERGE-STATUS: in-sync" "$outF2"
+refute f "F2: LLM_WIKI.md never surfaces in any diff class"                "LLM_WIKI.md" "$outF2"
+grep -q "Second paragraph" "$F2/LLM_WIKI.md" && ck f 0 "F2: multi-line identity intact after re-run" || ck f 1 "F2: multi-line identity intact after re-run" "second paragraph lost on re-run"
+
+# F5 — symmetric delta: an instance-only frontmatter key on a root file shows 'removed by accept', never an empty delta
+F5="$SB/acme-hotel"; mdrun bootstrap "$F5" "$P" >/dev/null 2>&1
+python3 - "$F5/SCHEMA.md" <<'PY'
+import sys
+p=sys.argv[1]; t=open(p).read()
+t=t.replace('contract-version: 1','contract-version: 1\nextra-instance-key: keepme',1)
+open(p,'w').write(t)
+PY
+git -C "$F5" commit -aqm "test: add an instance-only frontmatter key to SCHEMA.md" >/dev/null 2>&1
+outF5="$(mdrun install "$F5")"; rcF5=$?
+expect f "F5: instance-only key surfaces as removed-by-accept (symmetric, not empty)" "extra-instance-key: keepme → (removed by accept)" "$outF5"
+
+# F7 — a secret-looking *_FILE injection is refused (secret-egress guard)
+F7="$SB/acme-india"; PF7="$SB/params-secret"; SECF="$SB/id_rsa"
+printf 'PRIVATE KEY MATERIAL\n' > "$SECF"
+cat > "$PF7" <<EOF
+ROLE=private
+IDENTITY_FILE=$SECF
+EOF
+outF7="$(mdrun bootstrap "$F7" "$PF7")"; rcF7=$?
+if [ "$rcF7" -ne 0 ] && has "secret-looking file" "$outF7"; then ck f 0 "F7: secret-looking IDENTITY_FILE refused (rc=$rcF7)"; else ck f 1 "F7: secret-looking IDENTITY_FILE refused" "rc=$rcF7 :: $(printf '%s' "$outF7" | tail -2)"; fi
+echo
+
 # ============================ summary ============================
 echo "${BLD}=== GATE SUMMARY  (INSTALL.md @ genesis ${HEAD:0:12}) ===${RST}"
 red=0
-for L in a b c d e; do
+for L in a b c d e f; do
   if [ "${ST[$L]}" = pass ]; then printf '  %s%s: pass%s\n' "$GRN" "$L" "$RST"
   else printf '  %s%s: FAIL%s\n' "$RED" "$L" "$RST"; red=1; fi
 done

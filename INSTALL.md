@@ -165,22 +165,41 @@ fmval() { sed -n "s/^$1:[[:space:]]*//p" "$2" 2>/dev/null | head -1 | sed -e 's/
 slug=""; role=""; ref_block="[]"; identity=""; fork_url=""; upstream_url=""; born_date="$(date +%F)"
 if [ -f "$llm" ]; then
   slug="$(fmval wiki-slug "$llm")"; role="$(fmval wiki-role "$llm")"
-  rb="$(fmval reference-wikis "$llm")"; [ -n "$rb" ] && ref_block="$rb"
-  identity="$(awk '/^# .* identity/{f=1; next} f&&NF{print; exit}' "$llm" 2>/dev/null)"
   cd="$(fmval created "$llm")"; [ -n "$cd" ] && born_date="$cd"
-  src="$target/sources/git/$(basename "$target")-genesis/$(echo "$(basename "$target")" | tr '[:lower:]' '[:upper:]')-GENESIS.md"
+  # F1 (C20 slug-identity / C22 realpath-coherence): slug == folder name is a HARD invariant.
+  # Reading it two ways (frontmatter slug vs folder basename) is exactly the silent-clobber path —
+  # guard the ambiguity loudly rather than proceeding on divergent reads (silent chaos is the harm).
+  base="$(basename "$target")"
+  [ -n "$slug" ] && [ "$slug" != "$base" ] && { echo "FAIL[install]: wiki-slug '$slug' != folder name '$base' — slug==foldername is a hard invariant (contract C20 slug-identity / C22 realpath-coherence); rename the folder or fix wiki-slug, then re-run" >&2; exit 1; }
+  # fork/upstream provenance for the <SLUG>-GENESIS.md source page — resolved by the frontmatter slug, never basename
+  src="$target/sources/git/${slug}-genesis/$(printf '%s' "$slug" | tr '[:lower:]' '[:upper:]')-GENESIS.md"
   [ -f "$src" ] && { fork_url="$(fmval remote "$src")"; upstream_url="$(fmval upstream "$src")"; }
+  # identity + reference-wikis are instance-owned and live only in LLM_WIKI.md, which is excluded from
+  # overwrite on an existing wiki (F2, contract C9) — NOT read back here; birth reads them from params.
 fi
 # birth defaults / params-file overrides (KEY=VALUE; *_FILE keys inject multi-line values). No `source` — parsed safely.
+# F7: *_FILE contents land in committed wiki content — refuse secret-looking or oversized files (secret-egress guard).
+_sf_check() {
+  local f="$1" bn; bn="$(basename "$f")"
+  [ -f "$f" ] || { echo "FAIL[install]: params *_FILE not found: $f" >&2; return 1; }
+  case "$bn" in
+    .env|.env.*|*.pem|*.key|id_rsa*|id_ed25519*|*.p12|*.pfx|credentials|credentials.*|*secret*|*.crt)
+      echo "FAIL[install]: refusing to inject a secret-looking file into committed wiki content: $f" >&2; return 1 ;;
+  esac
+  [ "$(wc -c < "$f" 2>/dev/null || echo 0)" -gt 65536 ] && { echo "FAIL[install]: params *_FILE too large (>64KB), refusing: $f" >&2; return 1; }
+  return 0
+}
 if [ -n "$params_file" ] && [ -f "$params_file" ]; then
   while IFS='=' read -r pk pv; do case "$pk" in
     SLUG) slug="$pv";; ROLE) role="$pv";; FORK_REMOTE_URL) fork_url="$pv";; GENESIS_UPSTREAM_URL) upstream_url="$pv";;
     BORN_DATE) born_date="$pv";; REFERENCE_WIKIS) ref_block="$pv";; IDENTITY) identity="$pv";;
-    IDENTITY_FILE) [ -f "$pv" ] && identity="$(< "$pv")";; REFERENCE_WIKIS_FILE) [ -f "$pv" ] && ref_block="$(< "$pv")";;
+    IDENTITY_FILE) _sf_check "$pv" || exit 1; identity="$(< "$pv")";;
+    REFERENCE_WIKIS_FILE) _sf_check "$pv" || exit 1; ref_block="$(< "$pv")";;
     ''|\#*) : ;; esac done < "$params_file"
 fi
 [ -z "$slug" ] && slug="$(basename "$target")"
 slug_upper="$(printf '%s' "$slug" | tr '[:lower:]' '[:upper:]')"
+role="$(printf '%s' "$role" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"   # F6: normalize so 'Public'/' team ' can't slip past the role→hook selector into the no-hook branch
 [ -z "$role" ] && role="private"
 [ -z "$identity" ] && identity="$slug — identity not yet authored at birth. Edit LLM_WIKI.md to describe this wiki's subject and boundary."
 [ -z "$upstream_url" ] && upstream_url="$(git -C "$genesis" remote get-url upstream 2>/dev/null || git -C "$genesis" remote get-url origin 2>/dev/null || echo '')"
@@ -225,10 +244,13 @@ residue="$(find "$payload" -type f \( -name '*.md' -o -name '*.yaml' -o -name '*
 [ -n "$residue" ] && { printf 'FAIL[install]: unresolved {{token}} residue after render (aborting before copy):\n%s\n' "$residue" >&2; exit 1; }
 
 # --- diff: classify every template path against the target (target-only files are instance content — never touched, never listed) ---
-ROOT_CLASS=" SCHEMA.md CLAUDE.md LLM_WIKI.md meridian.yaml .gitignore .gitleaks.toml lefthook.yml "
+ROOT_CLASS=" SCHEMA.md CLAUDE.md meridian.yaml .gitignore .gitleaks.toml lefthook.yml "   # LLM_WIKI.md is NOT here — excluded from overwrite (F2/C9), handled below
 added=(); changed=(); changed_root=()
 while IFS= read -r rel; do
   tpath="$target/$rel"
+  # F2 (contract C9): LLM_WIKI.md is instance-owned identity — on an EXISTING wiki it is never
+  # re-rendered or overwritten (birth creates it once; a re-install leaves it entirely alone).
+  if [ "$rel" = "LLM_WIKI.md" ] && [ -e "$tpath" ]; then continue; fi
   if [ ! -e "$tpath" ]; then added+=("$rel")
   elif cmp -s "$payload/$rel" "$tpath"; then :                                            # identical — no diff
   elif printf '%s' "$ROOT_CLASS" | grep -q " $rel "; then changed_root+=("$rel")
@@ -244,23 +266,29 @@ echo "CHANGED (${#changed[@]}):";    for r in "${changed[@]}"; do echo "  ~ $r";
 echo "CHANGED-ROOT (${#changed_root[@]}) — diverged-root class, REFUSE by default, accept each explicitly:"
 for r in "${changed_root[@]}"; do
   echo "  ! $r"
-  python3 - "$target/$r" "$payload/$r" <<'PY' | sed 's/^/      field: /'
+  python3 - "$target/$r" "$payload/$r" <<'PY' | sed 's/^/      /'
 import sys, re
-def fm(path):
-    d = {}
+def parse(path):
+    fm = {}
     try: t = open(path, encoding='utf-8', errors='replace').read()
-    except OSError: return d
-    m = re.match(r'^---\n(.*?)\n---', t, re.S)
-    if not m: return d
+    except OSError: return fm, ''
+    m = re.match(r'^---\n(.*?)\n---\n?(.*)$', t, re.S)
+    if not m: return fm, t                                                        # no frontmatter → all body
     for line in m.group(1).splitlines():
         mm = re.match(r'^([A-Za-z0-9_-]+):\s?(.*)$', line)
         if mm:
             v = re.sub(r'\s+#.*$', '', mm.group(2).strip()).strip().strip('"\'')
-            d[mm.group(1)] = v
-    return d
-a, b = fm(sys.argv[1]), fm(sys.argv[2])
+            fm[mm.group(1)] = v
+    return fm, m.group(2)
+a, abody = parse(sys.argv[1])                                                     # target (installed now)
+b, bbody = parse(sys.argv[2])                                                     # template (what an accept would write)
+# symmetric: changed / removed-by-accept / added-by-accept — never an empty delta that hides a destructive accept
 for k in a:
-    if k in b and a[k] != b[k]: print(f"{k}: {a[k]} → {b[k]}")
+    if k not in b: print(f"field: {k}: {a[k]} → (removed by accept)")
+    elif a[k] != b[k]: print(f"field: {k}: {a[k]} → {b[k]}")
+for k in b:
+    if k not in a: print(f"field: (absent) → {k}: {b[k]} (added by accept)")
+if abody != bbody: print("body: differs — review the full file, not just the fields above")
 PY
   case "$accept_root" in *" $r "*) : ;; *) echo "      accept: re-run with accept-root arg containing \"$r\"" ;; esac
 done
@@ -284,10 +312,16 @@ case "$role" in
         'output:' '  - failure' 'pre-commit:' '  jobs:' '    - name: secrets-scan' \
         '      run: gitleaks git --staged --pre-commit --no-banner --redact' > "$target/lefthook.yml"
     fi
-    if command -v lefthook >/dev/null 2>&1; then ( cd "$target" && lefthook install --force >/dev/null 2>&1 ) && echo "hooks: lefthook secrets-scan active ($role)" || echo "WARN[install]: lefthook install failed" >&2
-    else echo "WARN[install]: lefthook binary absent — hook NOT active; install lefthook then re-run" >&2; fi ;;
+    # F6 fail-closed: team/public must NEVER reach a commit-able state without the secrets-scan hook (C45 no-unhooked-window)
+    if command -v lefthook >/dev/null 2>&1; then
+      ( cd "$target" && lefthook install --force >/dev/null 2>&1 ) \
+        && echo "hooks: lefthook secrets-scan active ($role)" \
+        || { echo "FAIL[install]: lefthook install failed for role=$role — team/public must not have an unhooked window (C45); fix lefthook then re-run" >&2; exit 1; }
+    else
+      echo "FAIL[install]: lefthook binary absent but role=$role requires the secrets-scan hook (C45 no-unhooked-window) — install lefthook then re-run" >&2; exit 1
+    fi ;;
   private) echo "hooks: role=private — no hooks (C45 role-selects-lint-pack: private keeps secrets in-repo, no scan)" ;;
-  *) echo "WARN[install]: unknown role '$role' — no hooks installed" >&2 ;;
+  *) echo "FAIL[install]: unknown role '$role' — must be private|team|public (C45 role-selects-lint-pack); refusing rather than silently skipping the hook" >&2; exit 1 ;;
 esac
 
 # --- end-state ---

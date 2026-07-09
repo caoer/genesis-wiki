@@ -15,7 +15,7 @@ tags: [type/literate-block, domain/contract]
 F1 resolution (2026-07-08, genesis pick = trim): original text measured ~452 tokens vs
 declared 250. Trim rule applied — 'is' column keeps only what orients a cold agent, clause
 restatements cut to bare C-ref (C38 applied to the block itself), write-column phrasing
-tightened, all 14 rows kept (user-required/load-bearing). Landed ~308; budget declared 320 —
+tightened, 13 rows kept (user-required/load-bearing; the GENESIS.md manifest row retired in v1.1). Landed ~293; budget declared 320 —
 trimmed to floor FIRST, then declared honestly (a budget that lies is worse than none — same
 law as the pins).
 
