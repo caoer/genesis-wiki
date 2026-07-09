@@ -111,10 +111,10 @@ else
 fi
 
 # 5. env printout — CCC_LLM_WIKI_PATH shadowing (multi-wiki host; R13/R14 recurrence)
-if [ "$(cd "$CCC_LLM_WIKI_PATH" 2>/dev/null && pwd -P)" = "$(cd "$target" 2>/dev/null && pwd -P)" ]; then
+if [ "$(cd "${CCC_LLM_WIKI_PATH:-}" 2>/dev/null && pwd -P)" = "$(cd "$target" 2>/dev/null && pwd -P)" ]; then
   echo "env: CCC_LLM_WIKI_PATH resolves to target — nested md calls hit the right wiki"
 else
-  echo "WARN[check]: CCC_LLM_WIKI_PATH=$CCC_LLM_WIKI_PATH does NOT resolve to target $target — nested md calls would shadow onto the wrong wiki"
+  echo "WARN[check]: CCC_LLM_WIKI_PATH=${CCC_LLM_WIKI_PATH:-<unset>} does NOT resolve to target $target — nested md calls would shadow onto the wrong wiki"
 fi
 
 [ "$fails" -eq 0 ] && { echo "CHECK: ok (warnings are non-fatal)"; exit 0; } || { echo "CHECK: $fails hard failure(s)" >&2; exit 1; }
@@ -132,6 +132,13 @@ the role hook. **Never commits.**
 `args: [target, params-file?, accept-root-list?]` — `params-file` supplies
 birth tokens (empty target); `accept-root-list` is a space-separated set of
 diverged-root paths to accept this run.
+
+**Crash recovery.** A run that dies mid-copy leaves a dirty tree and no commit;
+the next run's guard refuses until it is clean. Undo the partial copy **scoped to
+the paths the diff summary listed** — never a bare `git clean`, which would eat
+the wiki's own untracked instance content: revert modified template files with
+`git -C "$target" checkout -- <changed paths>` and delete only the summary's
+`ADDED` paths (`git -C "$target" clean -fd -- <those exact paths>`). Then re-run.
 
 ````bash
 # ^install — render+diff+install the genesis template into a target; no commit. args: [target, params-file?, accept-root?]
@@ -241,7 +248,7 @@ for r in "${changed_root[@]}"; do
 import sys, re
 def fm(path):
     d = {}
-    try: t = open(path, encoding='utf-8').read()
+    try: t = open(path, encoding='utf-8', errors='replace').read()
     except OSError: return d
     m = re.match(r'^---\n(.*?)\n---', t, re.S)
     if not m: return d
@@ -268,7 +275,7 @@ for r in "${changed_root[@]}"; do
 done
 [ "$held" -gt 0 ] && echo "root-refused: $held diverged-root file(s) held back — accept each explicitly, then re-run"
 
-# --- hooks: role-selected (C45). team/public get the secrets-scan pre-commit; private gets none. lefthook.yml is role-owned, never clobbered ---
+# --- hooks: role-selected (C45 role-selects-lint-pack). team/public get the secrets-scan pre-commit; private gets none. lefthook.yml is role-owned, never clobbered ---
 case "$role" in
   team|public)
     if [ ! -f "$target/lefthook.yml" ]; then
@@ -279,7 +286,7 @@ case "$role" in
     fi
     if command -v lefthook >/dev/null 2>&1; then ( cd "$target" && lefthook install --force >/dev/null 2>&1 ) && echo "hooks: lefthook secrets-scan active ($role)" || echo "WARN[install]: lefthook install failed" >&2
     else echo "WARN[install]: lefthook binary absent — hook NOT active; install lefthook then re-run" >&2; fi ;;
-  private) echo "hooks: role=private — no hooks (C45: private keeps secrets in-repo, no scan)" ;;
+  private) echo "hooks: role=private — no hooks (C45 role-selects-lint-pack: private keeps secrets in-repo, no scan)" ;;
   *) echo "WARN[install]: unknown role '$role' — no hooks installed" >&2 ;;
 esac
 

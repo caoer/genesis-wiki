@@ -27,8 +27,8 @@ duplicate has no home to come back to). Version mechanics never appear here — 
 the handshake block (S4). Clause refs are number+slug pointers (C39), not restatements.
 
 Render-once mechanics (LOCKED, meridian × genesis lanes): `md run --once-per-context`, dedupe key
-= (block-id `genesis-architecture`, rev = blob SHA of the materialized page at the wiki's
-pin). State is FILE-BASED, never daemon: `${XDG_CACHE_HOME:-~/.cache}/meridian/render-context/
+= (block-id `genesis-architecture`, rev = blob SHA of the materialized page as it currently
+stands). State is FILE-BASED, never daemon: `${XDG_CACHE_HOME:-~/.cache}/meridian/render-context/
 <context-key>/`, marker per (block-id, rev), TTL-GC ~48h; context key from
 `$CLAUDE_SESSION_ID` (or `--context-key`). First load renders the block; same (id, rev) later
 → one line: `architecture: inherited (genesis@<short-rev>, already in context)`. Differing
@@ -47,12 +47,11 @@ Flow: `inbox → sources → domains → synthesis → effects`.
 | `synthesis/` | cross-domain products | yes |
 | `effects/` | pin-verified page per artifact (C37 effect-pin-lifecycle) | effect lifecycle |
 | `decisions/` | decision queue (C34 decision-queue-lapse) | file, never delete |
-| `bases/` | computed views (C27 prescription-authored) | yes; contract rows hash-gated |
+| `bases/` | computed views (C27 prescription-authored) | yes; contract rows diff-adjudicated (C7) |
 | `logs/` | operational records | append only |
 | `templates/` | page templates | yes |
 | `foreign/` | stays empty (C23 no-mounts); cross-wiki `wiki://` (C24) | never |
 | sessions | **not in wiki** — `<slug>-sessions` companion (C44, C48) | session tools |
-| `GENESIS.md` | contract manifest + pin (C6) | never hand-edit |
 | `SCHEMA.md` | this wiki's contract entry | amendment flow (C11) |
 | `LLM_WIKI.md` | identity + reference-wikis block (C21) | body; block via `wiki add` |
 ```
