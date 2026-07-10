@@ -10,7 +10,7 @@ Genesis is itself an llm-wiki; normal llm-wiki conventions apply here too (contr
 
 ## What this wiki is
 
-The thin living upstream (`C1-thin-upstream`) for the llm-wiki fleet. Its shipped payload is the contract and nothing else: contract text, checks, computed-surface definitions. Knowledge about *how to run wikis* lives here — the contract domain plus operational guidance ([[VAULT-SETUP|domains/operations/]], recommendations, never law); knowledge about anything else belongs in a child wiki.
+The thin living upstream (`C1-thin-upstream`) for the llm-wiki fleet. Its shipped payload is the contract and nothing else: contract text, checks, computed-surface definitions. Knowledge about *how to run wikis* lives here — the contract domain plus operational guidance ([[VAULT-SETUP]], recommendations, never law); knowledge about anything else belongs in a child wiki.
 
 ## Where things are
 
